@@ -1,0 +1,90 @@
+import type { Appointment, Shift, Box, Hospitalization } from "@/types";
+
+const now = new Date();
+const d = (offsetDays: number, h = 0, m = 0) => {
+  const dt = new Date(now);
+  dt.setDate(dt.getDate() + offsetDays);
+  dt.setHours(h, m, 0, 0);
+  return dt.toISOString();
+};
+
+export const seedAppointments: Appointment[] = [
+  { id: "a1", petId: "p1", clientId: "c1", vetId: "u1", serviceType: "Consulta", status: "scheduled", date: d(0), startTime: "09:00", endTime: "09:30", duration: 30, notes: "Retorno pós-exame", recurring: false, createdAt: d(-3), updatedAt: d(-3) },
+  { id: "a2", petId: "p3", clientId: "c2", vetId: "u1", serviceType: "Consulta", status: "confirmed", date: d(0), startTime: "10:00", endTime: "10:30", duration: 30, notes: "Acompanhamento otite", recurring: false, createdAt: d(-5), updatedAt: d(-1) },
+  { id: "a3", petId: "p4", clientId: "c3", vetId: "u2", serviceType: "Banho e Tosa", status: "scheduled", date: d(0), startTime: "14:00", endTime: "15:30", duration: 90, recurring: true, recurringInterval: "monthly", createdAt: d(-7), updatedAt: d(-7) },
+  { id: "a4", petId: "p6", clientId: "c5", vetId: "u2", serviceType: "Vacinação", status: "scheduled", date: d(1), startTime: "09:30", endTime: "10:00", duration: 30, recurring: false, createdAt: d(-2), updatedAt: d(-2) },
+  { id: "a5", petId: "p2", clientId: "c1", vetId: "u1", serviceType: "Consulta", status: "completed", date: d(-1), startTime: "11:00", endTime: "11:30", duration: 30, recurring: false, createdAt: d(-8), updatedAt: d(-1) },
+  { id: "a6", petId: "p5", clientId: "c4", vetId: "u2", serviceType: "Exame", status: "scheduled", date: d(2), startTime: "15:00", endTime: "15:30", duration: 30, recurring: false, createdAt: d(-1), updatedAt: d(-1) },
+  { id: "a7", petId: "p1", clientId: "c1", vetId: "u1", serviceType: "Consulta", status: "cancelled", date: d(-2), startTime: "09:00", endTime: "09:30", duration: 30, recurring: false, createdAt: d(-10), updatedAt: d(-2) },
+  { id: "a8", petId: "p3", clientId: "c2", vetId: "u1", serviceType: "Cirurgia", status: "scheduled", date: d(3), startTime: "08:00", endTime: "10:00", duration: 120, notes: "Castração agendada", recurring: false, createdAt: d(-5), updatedAt: d(-5) },
+  { id: "a9", petId: "p7", clientId: "c2", vetId: "u2", serviceType: "Consulta", status: "scheduled", date: d(1), startTime: "11:00", endTime: "11:30", duration: 30, recurring: false, createdAt: d(-1), updatedAt: d(-1) },
+  { id: "a10", petId: "p4", clientId: "c3", vetId: "u1", serviceType: "Retorno", status: "scheduled", date: d(4), startTime: "10:00", endTime: "10:30", duration: 30, recurring: false, createdAt: d(-2), updatedAt: d(-2) },
+];
+
+export const seedShifts: Shift[] = [
+  { id: "sh1", userId: "u1", date: d(0), startTime: "08:00", endTime: "17:00" },
+  { id: "sh2", userId: "u2", date: d(0), startTime: "12:00", endTime: "20:00" },
+  { id: "sh3", userId: "u3", date: d(0), startTime: "08:00", endTime: "17:00" },
+  { id: "sh4", userId: "u1", date: d(1), startTime: "08:00", endTime: "17:00" },
+  { id: "sh5", userId: "u2", date: d(1), startTime: "08:00", endTime: "17:00" },
+  { id: "sh6", userId: "u3", date: d(1), startTime: "08:00", endTime: "17:00" },
+  { id: "sh7", userId: "u1", date: d(2), startTime: "08:00", endTime: "17:00" },
+  { id: "sh8", userId: "u2", date: d(2), startTime: "12:00", endTime: "20:00" },
+];
+
+export const seedBoxes: Box[] = [
+  { id: "b1", name: "Box 01", description: "Cão pequeno porte", active: true },
+  { id: "b2", name: "Box 02", description: "Cão médio porte", active: true },
+  { id: "b3", name: "Box 03", description: "Cão grande porte", active: true },
+  { id: "b4", name: "Box 04", description: "Felinos", active: true },
+  { id: "b5", name: "Box 05", description: "Isolamento", active: true },
+  { id: "b6", name: "Box 06", description: "Pós-cirúrgico", active: true },
+];
+
+export const seedHospitalizations: Hospitalization[] = [
+  {
+    id: "h1", petId: "p3", clientId: "c2", vetId: "u1", status: "active",
+    admissionDate: d(-3), boxId: "b2", reason: "Pós-operatório de hérnia de disco",
+    notes: "Monitorar movimentação dos membros posteriores",
+    prescriptions: [
+      { id: "hp1", medication: "Tramadol 50mg", dosage: "1 comprimido", frequency: "8/8h", startDate: d(-3), active: true },
+      { id: "hp2", medication: "Dipirona 500mg", dosage: "1/2 comprimido", frequency: "12/12h", startDate: d(-3), active: true },
+    ],
+    checklistItems: [
+      { id: "ci1", prescriptionId: "hp1", description: "Tramadol 08h", scheduledTime: d(0, 8, 0), completedAt: d(0, 8, 15), completedBy: "u3" },
+      { id: "ci2", prescriptionId: "hp1", description: "Tramadol 16h", scheduledTime: d(0, 16, 0) },
+      { id: "ci3", prescriptionId: "hp2", description: "Dipirona 08h", scheduledTime: d(0, 8, 0), completedAt: d(0, 8, 15), completedBy: "u3" },
+      { id: "ci4", prescriptionId: "hp2", description: "Dipirona 20h", scheduledTime: d(0, 20, 0) },
+    ],
+    createdAt: d(-3), updatedAt: d(0),
+  },
+  {
+    id: "h2", petId: "p6", clientId: "c5", vetId: "u2", status: "active",
+    admissionDate: d(-1), boxId: "b4", reason: "Crise respiratória",
+    notes: "Monitorar saturação de oxigênio",
+    prescriptions: [
+      { id: "hp3", medication: "Prednisolona 20mg", dosage: "1 comprimido", frequency: "24/24h", startDate: d(-1), active: true },
+      { id: "hp4", medication: "Amoxicilina 250mg", dosage: "1 comprimido", frequency: "12/12h", startDate: d(-1), active: true },
+    ],
+    checklistItems: [
+      { id: "ci5", prescriptionId: "hp3", description: "Prednisolona 09h", scheduledTime: d(0, 9, 0) },
+      { id: "ci6", prescriptionId: "hp4", description: "Amoxicilina 09h", scheduledTime: d(0, 9, 0) },
+      { id: "ci7", prescriptionId: "hp4", description: "Amoxicilina 21h", scheduledTime: d(0, 21, 0) },
+    ],
+    createdAt: d(-1), updatedAt: d(0),
+  },
+  {
+    id: "h3", petId: "p2", clientId: "c1", vetId: "u1", status: "discharged",
+    admissionDate: d(-91), dischargeDate: d(-89), boxId: "b4",
+    reason: "Pós-operatório castração",
+    prescriptions: [], checklistItems: [],
+    createdAt: d(-91), updatedAt: d(-89),
+  },
+  {
+    id: "h4", petId: "p1", clientId: "c1", vetId: "u1", status: "discharged",
+    admissionDate: d(-45), dischargeDate: d(-43), boxId: "b3",
+    reason: "Gastroenterite aguda",
+    prescriptions: [], checklistItems: [],
+    createdAt: d(-45), updatedAt: d(-43),
+  },
+];

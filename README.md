@@ -1,36 +1,101 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VetDom – Sistema de Gestão Veterinária
 
-## Getting Started
+Frontend completo para clínica veterinária / pet shop, construído com Next.js 14+, TypeScript, TailwindCSS e shadcn/ui. Toda a "API" é simulada em memória — não há backend real.
 
-First, run the development server:
+## Tecnologias
+
+- **Next.js 16** (App Router, Turbopack)
+- **TypeScript** com path aliases (`@/...` → `src/`)
+- **TailwindCSS v4** + **shadcn/ui** (componentes Radix UI)
+- **Zustand** – gerenciamento de estado (sessão, carrinho, filtros)
+- **React Hook Form + Zod** – formulários e validação
+- **Recharts** – gráficos no Dashboard
+- **Lucide React** – ícones
+
+## Instalação e execução
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Acesse [http://localhost:3000](http://localhost:3000). A raiz redireciona para `/dashboard`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Login (fake)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Qualquer usuário do seed pode fazer login com **qualquer senha**.
 
-## Learn More
+| Nome          | E-mail            | Perfil       |
+| ------------- | ----------------- | ------------ |
+| Admin VetDom  | admin@vetdom.com  | admin        |
+| Dra. Ana Lima | ana@vetdom.com    | vet          |
+| Carlos Recep. | carlos@vetdom.com | receptionist |
 
-To learn more about Next.js, take a look at the following resources:
+A sessão é salva no `localStorage` e persiste entre recarregamentos.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Mapa de rotas
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Rota             | Módulo                                  |
+| ---------------- | --------------------------------------- |
+| `/login`         | Tela de login                           |
+| `/dashboard`     | KPIs, gráficos, alertas                 |
+| `/agenda`        | Agendamentos (visão dia/semana)         |
+| `/clientes`      | Lista de clientes e pets                |
+| `/clientes/[id]` | Detalhe: prontuário, pets, eventos      |
+| `/internacao`    | Internações, prescrições, checklist     |
+| `/pdv`           | Ponto de venda (produtos + serviços)    |
+| `/estoque`       | Produtos, movimentações de estoque      |
+| `/financeiro`    | Receitas, despesas, contas              |
+| `/fiscal`        | Notas fiscais (NFC-e, NF-e, NFS-e)      |
+| `/mensagens`     | Templates WhatsApp, histórico de envios |
 
-## Deploy on Vercel
+## Estrutura de pastas
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+src/
+  components/
+    layout/       # Sidebar, Topbar, Breadcrumbs, AppLayout
+    ui/           # Componentes shadcn/ui (Button, Input, Dialog…)
+  hooks/          # useToast
+  lib/            # utils (cn, formatCurrency, formatDate, exportToCSV…)
+  mocks/
+    db.ts         # Banco em memória + CRUD genérico com latência simulada
+    seed-*.ts     # Dados iniciais por domínio
+  stores/         # Zustand: session, cart, filters
+  types/          # Todos os tipos TypeScript (index.ts)
+app/
+  (app)/          # Grupo autenticado (layout com Sidebar + Topbar)
+    dashboard/
+    agenda/
+    clientes/
+    internacao/
+    pdv/
+    estoque/
+    financeiro/
+    fiscal/
+    mensagens/
+  login/
+  globals.css
+  layout.tsx
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Dados seed e regras de negócio
+
+Os dados iniciais ficam em `src/mocks/seed-*.ts`:
+
+| Arquivo                | Conteúdo                                          |
+| ---------------------- | ------------------------------------------------- |
+| `seed-users.ts`        | Usuários do sistema                               |
+| `seed-clients.ts`      | Clientes, pets, eventos médicos                   |
+| `seed-appointments.ts` | Agendamentos, turnos, boxes, internações          |
+| `seed-commerce.ts`     | Produtos, serviços, vendas, pacotes               |
+| `seed-finance.ts`      | Categorias, contas, lançamentos, notas, mensagens |
+
+Para alterar regras de negócio (ex: status possíveis, categorias), edite os tipos em `src/types/index.ts` e os seeds correspondentes.
+
+## Notas sobre módulos simulados
+
+- **Fiscal**: emissão de NF é simulada localmente — em produção integraria com Focus NFe / NFe.io.
+- **WhatsApp**: envio é simulado — em produção integraria com Evolution API / Z-API.
+- **PDV**: ao finalizar uma venda, cria automaticamente um lançamento financeiro de receita.
+- **Estoque**: movimentações de entrada/saída atualizam o campo `stock` do produto.
