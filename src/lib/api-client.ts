@@ -2,7 +2,7 @@ import axios from "axios";
 import { useSessionStore } from "@/stores/session";
 
 export const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api",
+  baseURL: "http://159.203.136.104/api",
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -24,5 +24,5 @@ apiClient.interceptors.response.use(
       useSessionStore.getState().logout();
     }
     return Promise.reject(error);
-  }
+  },
 );
