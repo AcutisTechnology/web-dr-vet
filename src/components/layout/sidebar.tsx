@@ -35,50 +35,85 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "relative flex flex-col bg-primary text-primary-foreground transition-all duration-300 shrink-0",
+        "relative flex flex-col text-white transition-all duration-300 shrink-0 overflow-hidden",
         collapsed ? "w-16" : "w-60",
       )}
+      style={{
+        background:
+          "linear-gradient(160deg, #0f172a 0%, #0d2b3e 45%, #0f2a2a 100%)",
+        borderRight: "1px solid rgba(45,198,198,0.15)",
+      }}
     >
+      {/* Orbs decorativos de fundo */}
+      <div
+        className="pointer-events-none absolute -top-16 -left-16 w-48 h-48 rounded-full opacity-20 blur-3xl"
+        style={{ background: "#2dc6c6" }}
+      />
+      <div
+        className="pointer-events-none absolute bottom-10 -right-10 w-40 h-40 rounded-full opacity-10 blur-3xl"
+        style={{ background: "#6366f1" }}
+      />
+
       {/* Logo */}
       <div
         className={cn(
-          "flex items-center gap-3 px-4 py-4 border-b border-white/10",
+          "relative z-10 flex items-center gap-3 px-4 py-5",
           collapsed ? "justify-center px-2" : "",
         )}
       >
         {collapsed ? (
-          <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0 overflow-hidden">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
+            style={{
+              boxShadow:
+                "0 0 0 1.5px rgba(45,198,198,0.5), 0 0 12px rgba(45,198,198,0.2)",
+            }}
+          >
             <Image
               src="/images/logo.jpeg"
               alt="DrVet"
-              width={32}
-              height={32}
+              width={36}
+              height={36}
               className="object-cover"
             />
           </div>
         ) : (
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+          <div className="flex items-center gap-3 w-full">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
+              style={{
+                boxShadow:
+                  "0 0 0 1.5px rgba(45,198,198,0.5), 0 0 16px rgba(45,198,198,0.25)",
+              }}
+            >
               <Image
                 src="/images/logo.jpeg"
                 alt="DrVet"
-                width={36}
-                height={36}
+                width={40}
+                height={40}
                 className="object-cover"
               />
             </div>
-            <div>
-              <p className="font-bold text-sm leading-tight">DrVet</p>
-              <p className="text-xs text-white/60 leading-tight">
-                SaaS for Vets
+            <div className="min-w-0">
+              <p className="font-bold text-sm leading-tight tracking-widest uppercase text-white">
+                DrVet
               </p>
             </div>
           </div>
         )}
       </div>
 
+      {/* Divisor com gradiente teal */}
+      <div
+        className="mx-3 mb-2 h-px opacity-30"
+        style={{
+          background:
+            "linear-gradient(90deg, transparent, #2dc6c6, transparent)",
+        }}
+      />
+
       {/* Nav */}
-      <nav className="flex-1 py-4 overflow-y-auto">
+      <nav className="relative z-10 flex-1 px-2 py-2 overflow-y-auto space-y-1">
         {navItems.map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href);
           return (
@@ -86,25 +121,87 @@ export function Sidebar() {
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm transition-colors",
+                "group relative flex items-center gap-3 py-2.5 rounded-xl text-sm transition-all duration-200",
+                collapsed ? "justify-center px-0" : "px-3",
                 active
-                  ? "bg-white/20 text-white font-medium"
-                  : "text-white/70 hover:bg-white/10 hover:text-white",
-                collapsed && "justify-center px-0 mx-1",
+                  ? "text-white font-medium"
+                  : "text-white/45 hover:text-white/80",
               )}
+              style={
+                active
+                  ? {
+                      background:
+                        "linear-gradient(135deg, rgba(45,198,198,0.2) 0%, rgba(45,198,198,0.05) 100%)",
+                      boxShadow:
+                        "inset 0 0 0 1px rgba(45,198,198,0.25), 0 0 20px rgba(45,198,198,0.08)",
+                    }
+                  : undefined
+              }
+              onMouseEnter={(e) => {
+                if (!active)
+                  (e.currentTarget as HTMLElement).style.background =
+                    "rgba(255,255,255,0.04)";
+              }}
+              onMouseLeave={(e) => {
+                if (!active)
+                  (e.currentTarget as HTMLElement).style.background = "";
+              }}
               title={collapsed ? label : undefined}
             >
-              <Icon className="w-5 h-5 shrink-0" />
-              {!collapsed && <span>{label}</span>}
+              <Icon
+                className="w-[18px] h-[18px] shrink-0 transition-all duration-200"
+                style={
+                  active
+                    ? {
+                        color: "#2dc6c6",
+                        filter: "drop-shadow(0 0 6px rgba(45,198,198,0.6))",
+                      }
+                    : undefined
+                }
+              />
+              {!collapsed && (
+                <span className="tracking-wide text-[13px]">{label}</span>
+              )}
+              {/* Dot indicador no collapsed */}
+              {active && collapsed && (
+                <span
+                  className="absolute right-1 top-1 w-1.5 h-1.5 rounded-full"
+                  style={{
+                    background: "#2dc6c6",
+                    boxShadow: "0 0 6px #2dc6c6",
+                  }}
+                />
+              )}
             </Link>
           );
         })}
       </nav>
 
+      {/* Rodapé */}
+      {!collapsed && (
+        <div className="relative z-10 px-4 py-3">
+          <div
+            className="h-px mb-3 opacity-20"
+            style={{
+              background:
+                "linear-gradient(90deg, transparent, #2dc6c6, transparent)",
+            }}
+          />
+          <p className="text-[10px] text-white/25 text-center tracking-[0.2em] uppercase">
+            v1.0
+          </p>
+        </div>
+      )}
+
       {/* Collapse toggle */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-20 z-10 flex items-center justify-center w-6 h-6 bg-primary border border-white/20 rounded-full text-white/80 hover:text-white transition-colors"
+        className="absolute -right-3 top-22 z-20 flex items-center justify-center w-6 h-6 rounded-full text-white/60 hover:text-white transition-all duration-200"
+        style={{
+          background: "linear-gradient(135deg, #0d2b3e, #0f2a2a)",
+          border: "1px solid rgba(45,198,198,0.3)",
+          boxShadow: "0 0 10px rgba(45,198,198,0.15)",
+        }}
         aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
       >
         {collapsed ? (

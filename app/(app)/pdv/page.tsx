@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import {
   Plus,
   Trash2,
@@ -34,28 +34,22 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  clientsDb,
-  petsDb,
-  productsDb,
-  servicesDb,
-  salesDb,
-  financeEntriesDb,
-} from "@/mocks/db";
-import type {
-  Client,
-  Pet,
-  Product,
-  Service,
-  PaymentMethod,
-  ProductCategory,
-} from "@/types";
+  catalogService,
+  type ApiProduct,
+  type ApiService,
+  type StoreProductPayload,
+  type StoreServicePayload,
+} from "@/services/catalog.service";
+import { clientService } from "@/services/client.service";
+import { petService } from "@/services/pet.service";
 import { useCartStore } from "@/stores/cart";
 import { useSessionStore } from "@/stores/session";
-import { formatCurrency, generateId } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
-const PRODUCT_CATEGORIES: { value: ProductCategory; label: string }[] = [
+const PRODUCT_CATEGORIES: { value: string; label: string }[] = [
   { value: "food", label: "Alimentação" },
   { value: "medicine", label: "Medicamento" },
   { value: "accessory", label: "Acessório" },
@@ -67,7 +61,7 @@ const PRODUCT_CATEGORIES: { value: ProductCategory; label: string }[] = [
 const EMPTY_PRODUCT = {
   name: "",
   sku: "",
-  category: "other" as ProductCategory,
+  category: "other" as string,
   description: "",
   unit: "un",
   costPrice: "",
@@ -87,6 +81,13 @@ const EMPTY_SERVICE = {
   active: true,
 };
 
+type PaymentMethod =
+  | "cash"
+  | "credit_card"
+  | "debit_card"
+  | "pix"
+  | "bank_slip";
+
 const paymentMethods: {
   value: PaymentMethod;
   label: string;
@@ -101,14 +102,9 @@ const paymentMethods: {
 
 export default function PDVPage() {
   const { toast } = useToast();
-  const { user } = useSessionStore();
   const cart = useCartStore();
+  const qc = useQueryClient();
 
-  const [clients, setClients] = useState<Client[]>([]);
-  const [pets, setPets] = useState<Pet[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(true);
   const [productSearch, setProductSearch] = useState("");
   const [serviceSearch, setServiceSearch] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
@@ -117,41 +113,131 @@ export default function PDVPage() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
 
-  // CRUD state
   const [productDialogOpen, setProductDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingProduct, setEditingProduct] = useState<ApiProduct | null>(null);
   const [productForm, setProductForm] = useState({ ...EMPTY_PRODUCT });
   const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
-  const [editingService, setEditingService] = useState<Service | null>(null);
+  const [editingService, setEditingService] = useState<ApiService | null>(null);
   const [serviceForm, setServiceForm] = useState({ ...EMPTY_SERVICE });
-  const [savingCrud, setSavingCrud] = useState(false);
 
-  useEffect(() => {
-    Promise.all([
-      clientsDb.findAll(),
-      petsDb.findAll(),
-      productsDb.findAll(),
-      servicesDb.findAll(),
-    ]).then(([cls, pts, prds, svcs]) => {
-      setClients(cls.filter((c) => c.active));
-      setPets(pts);
-      setProducts(prds.filter((p) => p.active));
-      setServices(svcs.filter((s) => s.active));
-      setLoading(false);
-    });
-  }, []);
+  const { data: clients = [] } = useQuery({
+    queryKey: ["clients"],
+    queryFn: () => clientService.list(),
+  });
 
-  const clientPets = pets.filter((p) => p.clientId === cart.clientId);
-  const filteredProducts = products.filter(
+  const { data: allPets = [] } = useQuery({
+    queryKey: ["pets"],
+    queryFn: () => petService.list(),
+  });
+
+  const { data: products = [], isLoading: loadingProducts } = useQuery({
+    queryKey: ["products"],
+    queryFn: () => catalogService.listProducts(),
+  });
+
+  const { data: services = [], isLoading: loadingServices } = useQuery({
+    queryKey: ["services"],
+    queryFn: () => catalogService.listServices(),
+  });
+
+  const invalidateProducts = () =>
+    qc.invalidateQueries({ queryKey: ["products"] });
+  const invalidateServices = () =>
+    qc.invalidateQueries({ queryKey: ["services"] });
+
+  const createProductMutation = useMutation({
+    mutationFn: (payload: StoreProductPayload) =>
+      catalogService.createProduct(payload),
+    onSuccess: () => {
+      toast({ title: "Produto criado" });
+      setProductDialogOpen(false);
+      invalidateProducts();
+    },
+    onError: () =>
+      toast({ title: "Erro ao criar produto", variant: "destructive" }),
+  });
+
+  const updateProductMutation = useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: Partial<StoreProductPayload>;
+    }) => catalogService.updateProduct(id, payload),
+    onSuccess: () => {
+      toast({ title: "Produto atualizado" });
+      setProductDialogOpen(false);
+      invalidateProducts();
+    },
+    onError: () =>
+      toast({ title: "Erro ao atualizar produto", variant: "destructive" }),
+  });
+
+  const deleteProductMutation = useMutation({
+    mutationFn: (id: string) => catalogService.deleteProduct(id),
+    onSuccess: () => {
+      toast({ title: "Produto removido" });
+      invalidateProducts();
+    },
+    onError: () =>
+      toast({ title: "Erro ao remover produto", variant: "destructive" }),
+  });
+
+  const createServiceMutation = useMutation({
+    mutationFn: (payload: StoreServicePayload) =>
+      catalogService.createService(payload),
+    onSuccess: () => {
+      toast({ title: "Serviço criado" });
+      setServiceDialogOpen(false);
+      invalidateServices();
+    },
+    onError: () =>
+      toast({ title: "Erro ao criar serviço", variant: "destructive" }),
+  });
+
+  const updateServiceMutation = useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: Partial<StoreServicePayload>;
+    }) => catalogService.updateService(id, payload),
+    onSuccess: () => {
+      toast({ title: "Serviço atualizado" });
+      setServiceDialogOpen(false);
+      invalidateServices();
+    },
+    onError: () =>
+      toast({ title: "Erro ao atualizar serviço", variant: "destructive" }),
+  });
+
+  const deleteServiceMutation = useMutation({
+    mutationFn: (id: string) => catalogService.deleteService(id),
+    onSuccess: () => {
+      toast({ title: "Serviço removido" });
+      invalidateServices();
+    },
+    onError: () =>
+      toast({ title: "Erro ao remover serviço", variant: "destructive" }),
+  });
+
+  const clientPets = allPets.filter((p) => p.client?.id === cart.clientId);
+  const activeProducts = products.filter((p) => p.active !== false);
+  const activeServices = services.filter((s) => s.active !== false);
+
+  const filteredProducts = activeProducts.filter(
     (p) =>
       p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-      (p.sku ?? "").toLowerCase().includes(productSearch.toLowerCase()),
+      (p.barcode ?? "").toLowerCase().includes(productSearch.toLowerCase()),
   );
-  const filteredServices = services.filter((s) =>
+  const filteredServices = activeServices.filter((s) =>
     s.name.toLowerCase().includes(serviceSearch.toLowerCase()),
   );
 
-  const addProduct = (p: Product) => {
+  const addProduct = (p: ApiProduct) => {
+    const unitPrice = Number(p.sale_price);
     const existing = cart.items.find(
       (i) => i.referenceId === p.id && i.type === "product",
     );
@@ -166,22 +252,23 @@ export default function PDVPage() {
         referenceId: p.id,
         name: p.name,
         quantity: 1,
-        unitPrice: p.salePrice,
+        unitPrice,
         discount: 0,
-        total: p.salePrice,
+        total: unitPrice,
       });
     }
   };
 
-  const addService = (s: Service) => {
+  const addService = (s: ApiService) => {
+    const unitPrice = Number(s.price);
     cart.addItem({
       type: "service",
       referenceId: s.id,
       name: s.name,
       quantity: 1,
-      unitPrice: s.price,
+      unitPrice,
       discount: 0,
-      total: s.price,
+      total: unitPrice,
     });
   };
 
@@ -200,40 +287,31 @@ export default function PDVPage() {
     setPaymentAmount("");
   };
 
-  const refreshCatalog = useCallback(async () => {
-    const [prds, svcs] = await Promise.all([
-      productsDb.findAll(),
-      servicesDb.findAll(),
-    ]);
-    setProducts(prds.filter((p) => p.active));
-    setServices(svcs.filter((s) => s.active));
-  }, []);
-
   const openNewProduct = () => {
     setEditingProduct(null);
     setProductForm({ ...EMPTY_PRODUCT });
     setProductDialogOpen(true);
   };
 
-  const openEditProduct = (p: Product) => {
+  const openEditProduct = (p: ApiProduct) => {
     setEditingProduct(p);
     setProductForm({
       name: p.name,
-      sku: p.sku ?? "",
+      sku: p.barcode ?? "",
       category: p.category,
-      description: p.description ?? "",
+      description: p.notes ?? "",
       unit: p.unit,
-      costPrice: String(p.costPrice),
-      salePrice: String(p.salePrice),
+      costPrice: String(p.cost_price),
+      salePrice: String(p.sale_price),
       stock: String(p.stock),
-      minStock: String(p.minStock),
-      supplier: p.supplier ?? "",
+      minStock: String(p.min_stock),
+      supplier: "",
       active: p.active,
     });
     setProductDialogOpen(true);
   };
 
-  const handleSaveProduct = async () => {
+  const handleSaveProduct = () => {
     if (!productForm.name.trim() || !productForm.salePrice) {
       toast({
         title: "Nome e preço de venda são obrigatórios",
@@ -241,37 +319,28 @@ export default function PDVPage() {
       });
       return;
     }
-    setSavingCrud(true);
-    const data = {
+    const payload: StoreProductPayload = {
       name: productForm.name.trim(),
-      sku: productForm.sku || undefined,
-      category: productForm.category,
-      description: productForm.description || undefined,
+      category: productForm.category || "other",
       unit: productForm.unit || "un",
-      costPrice: parseFloat(productForm.costPrice) || 0,
-      salePrice: parseFloat(productForm.salePrice),
+      cost_price: parseFloat(productForm.costPrice) || 0,
+      sale_price: parseFloat(productForm.salePrice),
       stock: parseInt(productForm.stock) || 0,
-      minStock: parseInt(productForm.minStock) || 0,
-      supplier: productForm.supplier || undefined,
+      min_stock: parseInt(productForm.minStock) || 0,
+      barcode: productForm.sku || undefined,
+      notes: productForm.description || undefined,
       active: productForm.active,
     };
     if (editingProduct) {
-      await productsDb.update(editingProduct.id, data);
-      toast({ title: "Produto atualizado" });
+      updateProductMutation.mutate({ id: editingProduct.id, payload });
     } else {
-      await productsDb.create(data);
-      toast({ title: "Produto criado" });
+      createProductMutation.mutate(payload);
     }
-    await refreshCatalog();
-    setProductDialogOpen(false);
-    setSavingCrud(false);
   };
 
-  const handleDeleteProduct = async (id: string) => {
+  const handleDeleteProduct = (id: string) => {
     if (!confirm("Remover produto?")) return;
-    await productsDb.update(id, { active: false });
-    await refreshCatalog();
-    toast({ title: "Produto removido" });
+    deleteProductMutation.mutate(id);
   };
 
   const openNewService = () => {
@@ -280,7 +349,7 @@ export default function PDVPage() {
     setServiceDialogOpen(true);
   };
 
-  const openEditService = (s: Service) => {
+  const openEditService = (s: ApiService) => {
     setEditingService(s);
     setServiceForm({
       name: s.name,
@@ -293,13 +362,12 @@ export default function PDVPage() {
     setServiceDialogOpen(true);
   };
 
-  const handleSaveService = async () => {
+  const handleSaveService = () => {
     if (!serviceForm.name.trim() || !serviceForm.price) {
       toast({ title: "Nome e preço são obrigatórios", variant: "destructive" });
       return;
     }
-    setSavingCrud(true);
-    const data = {
+    const payload: StoreServicePayload = {
       name: serviceForm.name.trim(),
       category: serviceForm.category || "Geral",
       price: parseFloat(serviceForm.price),
@@ -310,22 +378,15 @@ export default function PDVPage() {
       active: serviceForm.active,
     };
     if (editingService) {
-      await servicesDb.update(editingService.id, data);
-      toast({ title: "Serviço atualizado" });
+      updateServiceMutation.mutate({ id: editingService.id, payload });
     } else {
-      await servicesDb.create(data);
-      toast({ title: "Serviço criado" });
+      createServiceMutation.mutate(payload);
     }
-    await refreshCatalog();
-    setServiceDialogOpen(false);
-    setSavingCrud(false);
   };
 
-  const handleDeleteService = async (id: string) => {
+  const handleDeleteService = (id: string) => {
     if (!confirm("Remover serviço?")) return;
-    await servicesDb.update(id, { active: false });
-    await refreshCatalog();
-    toast({ title: "Serviço removido" });
+    deleteServiceMutation.mutate(id);
   };
 
   const handleFinalize = async () => {
@@ -341,66 +402,44 @@ export default function PDVPage() {
       return;
     }
     setProcessing(true);
-    const sale = await salesDb.create({
-      clientId: cart.clientId ?? undefined,
-      petId: cart.petId ?? undefined,
-      status: "completed",
-      items: cart.items,
-      subtotal: cart.subtotal(),
-      discount: cart.discount,
-      total: cart.total(),
-      payments: cart.payments.map((p) => ({ ...p, id: generateId() })),
-      userId: user?.id ?? "u3",
-    });
-
-    const now = new Date().toISOString();
-    const payMethod = cart.payments[0]?.method;
-
-    // Global finance entry for the sale
-    await financeEntriesDb.create({
-      type: "income",
-      description: `Venda PDV #${sale.id.slice(-4)}`,
-      amount: sale.total,
-      dueDate: now,
-      paidDate: now,
-      status: "paid",
-      categoryId: "fc2",
-      accountId: "fa1",
-      paymentMethod: payMethod,
-      referenceId: sale.id,
-      recurring: false,
-    });
-
-    // If a pet was selected, create per-item finance entries linked to the pet (read-only)
-    if (sale.petId) {
-      for (const item of sale.items) {
-        await financeEntriesDb.create({
-          type: "income",
-          description: `[PDV] ${item.name}${item.quantity > 1 ? ` (${item.quantity}x)` : ""}`,
-          amount: item.total,
-          dueDate: now,
-          paidDate: now,
-          status: "paid",
-          categoryId: "fc2",
-          paymentMethod: payMethod,
-          referenceId: sale.id,
-          petId: sale.petId,
-          fromSale: true,
-          recurring: false,
-        });
-      }
+    try {
+      await catalogService.createSale({
+        client_id: cart.clientId ?? undefined,
+        pet_id: cart.petId ?? undefined,
+        date: new Date().toISOString().split("T")[0],
+        total: cart.total(),
+        discount: cart.discount,
+        status: "completed",
+        items: cart.items.map((i) => ({
+          type: i.type as "product" | "service",
+          item_id: i.referenceId,
+          quantity: i.quantity,
+          price: i.unitPrice,
+          discount: i.discount,
+        })),
+        payments: cart.payments.map((p) => ({
+          method: p.method,
+          amount: p.amount,
+          installments: p.installments,
+        })),
+      });
+      toast({
+        title: "Venda finalizada!",
+        description: `Total: ${formatCurrency(cart.total())}`,
+      });
+      cart.clearCart();
+      setCheckoutOpen(false);
+      qc.invalidateQueries({ queryKey: ["finance-entries"] });
+      qc.invalidateQueries({ queryKey: ["products"] });
+    } catch {
+      toast({ title: "Erro ao finalizar venda", variant: "destructive" });
+    } finally {
+      setProcessing(false);
     }
-
-    toast({
-      title: "Venda finalizada!",
-      description: `Total: ${formatCurrency(sale.total)}`,
-    });
-    cart.clearCart();
-    setCheckoutOpen(false);
-    setProcessing(false);
   };
 
-  if (loading)
+  const isLoading = loadingProducts || loadingServices;
+  if (isLoading)
     return (
       <div className="flex items-center justify-center h-48">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -471,7 +510,7 @@ export default function PDVPage() {
                     >
                       <td className="px-4 py-2 font-medium">{p.name}</td>
                       <td className="px-4 py-2 text-muted-foreground">
-                        {p.sku ?? "—"}
+                        {p.barcode ?? "—"}
                       </td>
                       <td className="px-4 py-2">
                         <Badge variant="outline" className="text-xs">
@@ -481,12 +520,12 @@ export default function PDVPage() {
                         </Badge>
                       </td>
                       <td className="px-4 py-2 text-right font-semibold text-primary">
-                        {formatCurrency(p.salePrice)}
+                        {formatCurrency(p.sale_price)}
                       </td>
                       <td className="px-4 py-2 text-right">
                         <span
                           className={
-                            p.stock <= p.minStock
+                            p.stock <= p.min_stock
                               ? "text-red-500 font-semibold"
                               : ""
                           }
@@ -674,9 +713,11 @@ export default function PDVPage() {
                         className="text-left p-3 border rounded-lg hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <p className="text-sm font-medium truncate">{p.name}</p>
-                        <p className="text-xs text-muted-foreground">{p.sku}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {p.barcode ?? p.category}
+                        </p>
                         <p className="text-sm font-bold text-primary mt-1">
-                          {formatCurrency(p.salePrice)}
+                          {formatCurrency(p.sale_price)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Estoque: {p.stock}
@@ -910,6 +951,7 @@ export default function PDVPage() {
                       placeholder="Valor"
                       value={paymentAmount}
                       onChange={(e) => setPaymentAmount(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && addPayment()}
                       className="flex-1"
                     />
                     {paymentMethod === "credit_card" && (
@@ -930,17 +972,32 @@ export default function PDVPage() {
                       </Select>
                     )}
                     <Button variant="outline" onClick={addPayment}>
-                      +
+                      Adicionar
                     </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full text-xs"
-                    onClick={() => setPaymentAmount(String(cart.remaining()))}
-                  >
-                    Usar valor restante ({formatCurrency(cart.remaining())})
-                  </Button>
+                  {cart.remaining() > 0 && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        const remaining = cart.remaining();
+                        cart.addPayment({
+                          method: paymentMethod,
+                          amount: remaining,
+                          installments:
+                            paymentMethod === "credit_card"
+                              ? parseInt(installments)
+                              : undefined,
+                        });
+                        setPaymentAmount("");
+                      }}
+                    >
+                      Cobrar {formatCurrency(cart.remaining())} em{" "}
+                      {paymentMethods.find((m) => m.value === paymentMethod)
+                        ?.label ?? paymentMethod}
+                    </Button>
+                  )}
                 </div>
               </div>
               <DialogFooter>
@@ -998,7 +1055,7 @@ export default function PDVPage() {
                 onValueChange={(v) =>
                   setProductForm((f) => ({
                     ...f,
-                    category: v as ProductCategory,
+                    category: v,
                   }))
                 }
               >
@@ -1101,8 +1158,17 @@ export default function PDVPage() {
             >
               Cancelar
             </Button>
-            <Button onClick={handleSaveProduct} disabled={savingCrud}>
-              {savingCrud ? "Salvando..." : "Salvar"}
+            <Button
+              onClick={handleSaveProduct}
+              disabled={
+                createProductMutation.isPending ||
+                updateProductMutation.isPending
+              }
+            >
+              {createProductMutation.isPending ||
+              updateProductMutation.isPending
+                ? "Salvando..."
+                : "Salvar"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1189,8 +1255,17 @@ export default function PDVPage() {
             >
               Cancelar
             </Button>
-            <Button onClick={handleSaveService} disabled={savingCrud}>
-              {savingCrud ? "Salvando..." : "Salvar"}
+            <Button
+              onClick={handleSaveService}
+              disabled={
+                createServiceMutation.isPending ||
+                updateServiceMutation.isPending
+              }
+            >
+              {createServiceMutation.isPending ||
+              updateServiceMutation.isPending
+                ? "Salvando..."
+                : "Salvar"}
             </Button>
           </DialogFooter>
         </DialogContent>

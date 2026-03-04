@@ -14,7 +14,11 @@ interface CartState {
   removeItem: (id: string) => void;
   updateItem: (id: string, data: Partial<SaleItem>) => void;
   setDiscount: (discount: number) => void;
-  addPayment: (payment: { method: PaymentMethod; amount: number; installments?: number }) => void;
+  addPayment: (payment: {
+    method: PaymentMethod;
+    amount: number;
+    installments?: number;
+  }) => void;
   removePayment: (index: number) => void;
   clearCart: () => void;
   subtotal: () => number;
@@ -45,8 +49,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   setDiscount: (discount) => set({ discount }),
 
-  addPayment: (payment) =>
-    set((s) => ({ payments: [...s.payments, payment] })),
+  addPayment: (payment) => set((s) => ({ payments: [...s.payments, payment] })),
 
   removePayment: (index) =>
     set((s) => ({ payments: s.payments.filter((_, i) => i !== index) })),
@@ -54,10 +57,14 @@ export const useCartStore = create<CartState>((set, get) => ({
   clearCart: () =>
     set({ clientId: null, petId: null, items: [], discount: 0, payments: [] }),
 
-  subtotal: () => get().items.reduce((sum, i) => sum + i.total, 0),
-  total: () => get().subtotal() - get().discount,
+  subtotal: () =>
+    get().items.reduce((sum, i) => sum + (Number(i.total) || 0), 0),
+  total: () => get().subtotal() - (Number(get().discount) || 0),
   remaining: () => {
-    const paid = get().payments.reduce((sum, p) => sum + p.amount, 0);
+    const paid = get().payments.reduce(
+      (sum, p) => sum + (Number(p.amount) || 0),
+      0,
+    );
     return Math.max(0, get().total() - paid);
   },
 }));

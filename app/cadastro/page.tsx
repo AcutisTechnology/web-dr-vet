@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, ArrowLeft, CheckCircle2 } from "lucide-react";
 import Image from "next/image";
@@ -14,8 +13,8 @@ import {
 } from "@/components/cadastro/cadastro-steps";
 import { INITIAL_FORM } from "@/components/cadastro/cadastro-types";
 import type { RegFormData } from "@/components/cadastro/cadastro-types";
-import { useUserRegistry } from "@/stores/user-registry";
-import type { User } from "@/types";
+import { useRegister } from "@/hooks/use-auth";
+import type { RegisterPayload } from "@/types/api";
 
 const STEPS_CLINIC = [
   "Tipo de uso",
@@ -27,13 +26,15 @@ const STEPS_CLINIC = [
 const STEPS_AUTO = ["Tipo de uso", "Seus dados", "Sua conta", "Confirmar"];
 
 export default function CadastroPage() {
-  const router = useRouter();
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<RegFormData>(INITIAL_FORM);
 
-  const { addUser } = useUserRegistry();
+  const {
+    mutate: registerUser,
+    isPending: submitting,
+    error: registerError,
+  } = useRegister();
   const isAuto = form.clinicType === "autonomous";
   const steps = isAuto ? STEPS_AUTO : STEPS_CLINIC;
   const totalSteps = steps.length;
@@ -102,48 +103,25 @@ export default function CadastroPage() {
     setStep((s) => s - 1);
   }
 
-  async function handleSubmit() {
-    setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 600));
+  function handleSubmit() {
+    if (!form.clinicType) return;
 
-    const clinicId = crypto.randomUUID();
-    const now = new Date().toISOString();
-    const isClinic = form.clinicType !== "autonomous";
-    const clinicName = isClinic ? form.clinicName : undefined;
-
-    // Owner / autonomous user
-    const ownerUser: User = {
-      id: crypto.randomUUID(),
+    const payload: RegisterPayload = {
       name: form.ownerName,
       email: form.ownerEmail,
-      role: "admin",
-      accountType: isClinic ? "clinic_owner" : "autonomous",
-      clinicId: isClinic ? clinicId : undefined,
-      clinicName,
-      active: true,
-      createdAt: now,
+      password: form.ownerPassword,
+      password_confirmation: form.ownerConfirmPassword,
+      phone: form.phone,
+      clinic_type: form.clinicType as RegisterPayload["clinic_type"],
+      clinic_name:
+        form.clinicType !== "autonomous" ? form.clinicName : undefined,
+      address:
+        form.clinicType !== "autonomous"
+          ? { city: form.city, state: form.state }
+          : undefined,
     };
-    addUser({ ...ownerUser, passwordHash: form.ownerPassword });
 
-    // Additional team users (clinic/hospital only)
-    if (isClinic && form.hasAdditionalUsers) {
-      form.additionalUsers.forEach((u) => {
-        const teamUser: User = {
-          id: crypto.randomUUID(),
-          name: u.name,
-          email: u.email,
-          role: u.role,
-          accountType: "clinic_user",
-          clinicId,
-          clinicName,
-          active: true,
-          createdAt: now,
-        };
-        addUser({ ...teamUser, passwordHash: u.password });
-      });
-    }
-
-    router.replace("/login?registered=1");
+    registerUser(payload);
   }
 
   // Map step index → component (autonomous path skips StepEquipe)
@@ -258,6 +236,17 @@ export default function CadastroPage() {
 
           <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
             {renderStep()}
+
+            {registerError && isLastStep && (
+              <div className="mt-4 rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
+                {registerError.response?.data?.errors
+                  ? Object.values(registerError.response.data.errors)
+                      .flat()
+                      .join(" ")
+                  : (registerError.response?.data?.message ??
+                    "Erro ao criar conta. Tente novamente.")}
+              </div>
+            )}
 
             {/* ── Navigation buttons ── */}
             <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">

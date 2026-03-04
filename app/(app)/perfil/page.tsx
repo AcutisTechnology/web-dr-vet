@@ -51,7 +51,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export default function PerfilPage() {
-  const { user, login } = useSessionStore();
+  const { user, token, login } = useSessionStore();
   const { toast } = useToast();
 
   const [profileForm, setProfileForm] = useState({
@@ -94,11 +94,14 @@ export default function PerfilPage() {
     }
     setSavingProfile(true);
     await new Promise((r) => setTimeout(r, 400));
-    login({
-      ...user,
-      name: profileForm.name.trim(),
-      email: profileForm.email.trim(),
-    });
+    login(
+      {
+        ...user,
+        name: profileForm.name.trim(),
+        email: profileForm.email.trim(),
+      },
+      token ?? "",
+    );
     toast({ title: "Perfil atualizado com sucesso!" });
     setSavingProfile(false);
   };

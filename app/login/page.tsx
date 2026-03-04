@@ -1,22 +1,13 @@
 "use client";
 import { useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import {
-  Eye,
-  EyeOff,
-  CheckCircle2,
-  Building2,
-  Stethoscope,
-  User,
-} from "lucide-react";
+import { Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import Image from "next/image";
-import { useSessionStore } from "@/stores/session";
-import { seedUsers } from "@/mocks/seed-users";
-import { useUserRegistry } from "@/stores/user-registry";
+import { useLogin } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,7 +18,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { AccountType } from "@/types";
 
 const schema = z.object({
   email: z.string().email("E-mail inválido"),
@@ -35,70 +25,28 @@ const schema = z.object({
 });
 type FormData = z.infer<typeof schema>;
 
-const ACCOUNT_TYPE_LABELS: Record<
-  AccountType,
-  { label: string; icon: React.ElementType; color: string }
-> = {
-  clinic_owner: {
-    label: "Administrador da Clínica",
-    icon: Building2,
-    color: "text-[#1B2A6B] bg-[#1B2A6B]/10",
-  },
-  clinic_user: {
-    label: "Usuário da Clínica",
-    icon: User,
-    color: "text-[#2DC6C6] bg-[#2DC6C6]/10",
-  },
-  autonomous: {
-    label: "Veterinário Autônomo",
-    icon: Stethoscope,
-    color: "text-emerald-700 bg-emerald-50",
-  },
-};
-
 function LoginContent() {
-  const router = useRouter();
   const params = useSearchParams();
   const registered = params.get("registered") === "1";
-  const { login } = useSessionStore();
-  const { findByEmail } = useUserRegistry();
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
+
+  const { mutate: login, isPending, error } = useLogin();
 
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
 
-  const onSubmit = async (data: FormData) => {
-    setError("");
-    await new Promise((r) => setTimeout(r, 500));
+  const apiError =
+    error?.response?.data?.errors?.email?.[0] ??
+    error?.response?.data?.message ??
+    (error ? "E-mail ou senha incorretos." : "");
 
-    // Check registry (real registered users) first
-    const registryUser = findByEmail(data.email);
-    if (registryUser) {
-      if (registryUser.passwordHash !== data.password) {
-        setError("E-mail ou senha incorretos.");
-        return;
-      }
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { passwordHash: _, ...userWithoutHash } = registryUser;
-      login(userWithoutHash);
-      router.replace("/dashboard");
-      return;
-    }
-
-    // Fall back to seed/demo users (any password accepted)
-    const seedUser = seedUsers.find((u) => u.email === data.email);
-    if (!seedUser) {
-      setError("E-mail ou senha incorretos.");
-      return;
-    }
-    login(seedUser);
-    router.replace("/dashboard");
+  const onSubmit = (data: FormData) => {
+    login({ email: data.email, password: data.password });
   };
 
   return (
@@ -185,17 +133,17 @@ function LoginContent() {
                   </p>
                 )}
               </div>
-              {error && (
+              {apiError && (
                 <div className="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
-                  {error}
+                  {apiError}
                 </div>
               )}
               <Button
                 type="submit"
                 className="w-full bg-gradient-to-r from-[#1B2A6B] to-[#2DC6C6] hover:opacity-90 transition-opacity"
-                disabled={isSubmitting}
+                disabled={isPending}
               >
-                {isSubmitting ? "Entrando..." : "Entrar"}
+                {isPending ? "Entrando..." : "Entrar"}
               </Button>
             </form>
             <p className="text-center text-sm text-muted-foreground mt-4">
@@ -207,46 +155,6 @@ function LoginContent() {
                 Cadastre-se grátis
               </Link>
             </p>
-          </CardContent>
-        </Card>
-
-        {/* Credenciais de demo */}
-        <Card className="bg-muted/40 border-dashed">
-          <CardContent className="pt-4 pb-4">
-            <p className="text-xs font-medium text-muted-foreground mb-3">
-              Contas demo (qualquer senha):
-            </p>
-            <div className="space-y-2">
-              {seedUsers.map((u) => {
-                const meta = ACCOUNT_TYPE_LABELS[u.accountType];
-                const Icon = meta.icon;
-                return (
-                  <div
-                    key={u.id}
-                    className="flex items-center justify-between text-xs gap-2"
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span
-                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${meta.color}`}
-                      >
-                        <Icon className="w-3 h-3" />
-                        {u.accountType === "clinic_owner"
-                          ? "Admin"
-                          : u.accountType === "clinic_user"
-                            ? "Usuário"
-                            : "Autônomo"}
-                      </span>
-                      <span className="text-foreground font-medium truncate">
-                        {u.name}
-                      </span>
-                    </div>
-                    <span className="text-muted-foreground shrink-0">
-                      {u.email}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
           </CardContent>
         </Card>
       </div>

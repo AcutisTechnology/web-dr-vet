@@ -1,12 +1,15 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import {
   Plus,
   TrendingUp,
   TrendingDown,
   DollarSign,
   Download,
-  Filter,
+  Pencil,
+  Trash2,
+  Tag,
+  Landmark,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -37,12 +39,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  financeEntriesDb,
-  financeCategoriesDb,
-  financeAccountsDb,
-} from "@/mocks/db";
-import type { FinanceEntry, FinanceCategory, FinanceAccount } from "@/types";
+  financeService,
+  type ApiFinanceEntry,
+  type ApiFinanceCategory,
+  type ApiFinanceAccount,
+  type StoreFinanceEntryPayload,
+} from "@/services/finance.service";
 import { formatCurrency, formatDate, exportToCSV } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -53,7 +57,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
 
 const statusColors: Record<
@@ -82,46 +85,135 @@ const paymentMethodLabels: Record<string, string> = {
 
 export default function FinanceiroPage() {
   const { toast } = useToast();
-  const [entries, setEntries] = useState<FinanceEntry[]>([]);
-  const [categories, setCategories] = useState<FinanceCategory[]>([]);
-  const [accounts, setAccounts] = useState<FinanceAccount[]>([]);
-  const [loading, setLoading] = useState(true);
+  const qc = useQueryClient();
+
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingEntry, setEditingEntry] = useState<FinanceEntry | null>(null);
+  const [editingEntry, setEditingEntry] = useState<ApiFinanceEntry | null>(
+    null,
+  );
+
+  const [catDialogOpen, setCatDialogOpen] = useState(false);
+  const [catForm, setCatForm] = useState({
+    name: "",
+    type: "income" as "income" | "expense",
+  });
+  const [accDialogOpen, setAccDialogOpen] = useState(false);
+  const [accForm, setAccForm] = useState({
+    name: "",
+    type: "checking" as string,
+    balance: "",
+  });
+
   const [form, setForm] = useState({
     type: "income" as "income" | "expense",
     description: "",
     amount: "",
-    dueDate: new Date().toISOString().split("T")[0],
+    date: new Date().toISOString().split("T")[0],
     categoryId: "",
     accountId: "",
     paymentMethod: "",
-    recurring: false,
-    recurringInterval: "monthly" as "weekly" | "monthly" | "yearly",
+    status: "pending" as string,
   });
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [ents, cats, accs] = await Promise.all([
-      financeEntriesDb.findAll(),
-      financeCategoriesDb.findAll(),
-      financeAccountsDb.findAll(),
-    ]);
-    setEntries(
-      ents.sort(
-        (a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime(),
-      ),
-    );
-    setCategories(cats);
-    setAccounts(accs);
-    setLoading(false);
-  }, []);
+  const { data: entries = [], isLoading } = useQuery({
+    queryKey: ["finance-entries"],
+    queryFn: () => financeService.listEntries(),
+  });
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { data: categories = [] } = useQuery({
+    queryKey: ["finance-categories"],
+    queryFn: () => financeService.listCategories(),
+  });
+
+  const { data: accounts = [] } = useQuery({
+    queryKey: ["finance-accounts"],
+    queryFn: () => financeService.listAccounts(),
+  });
+
+  const invalidate = () =>
+    qc.invalidateQueries({ queryKey: ["finance-entries"] });
+  const invalidateCats = () =>
+    qc.invalidateQueries({ queryKey: ["finance-categories"] });
+  const invalidateAccs = () =>
+    qc.invalidateQueries({ queryKey: ["finance-accounts"] });
+
+  const createMutation = useMutation({
+    mutationFn: (payload: StoreFinanceEntryPayload) =>
+      financeService.createEntry(payload),
+    onSuccess: () => {
+      toast({ title: "Lançamento criado" });
+      setDialogOpen(false);
+      invalidate();
+    },
+    onError: () =>
+      toast({ title: "Erro ao criar lançamento", variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: Partial<StoreFinanceEntryPayload>;
+    }) => financeService.updateEntry(id, payload),
+    onSuccess: () => {
+      toast({ title: "Lançamento atualizado" });
+      setDialogOpen(false);
+      invalidate();
+    },
+    onError: () =>
+      toast({ title: "Erro ao atualizar", variant: "destructive" }),
+  });
+
+  const markPaidMutation = useMutation({
+    mutationFn: (id: string) => financeService.markPaid(id),
+    onSuccess: () => {
+      toast({ title: "Marcado como pago" });
+      invalidate();
+    },
+    onError: () =>
+      toast({ title: "Erro ao marcar como pago", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => financeService.deleteEntry(id),
+    onSuccess: () => {
+      toast({ title: "Lançamento excluído" });
+      invalidate();
+    },
+    onError: () => toast({ title: "Erro ao excluir", variant: "destructive" }),
+  });
+
+  const createCatMutation = useMutation({
+    mutationFn: (payload: { name: string; type: string }) =>
+      financeService.createCategory(payload),
+    onSuccess: (cat: ApiFinanceCategory) => {
+      toast({ title: "Categoria criada" });
+      setCatDialogOpen(false);
+      setCatForm({ name: "", type: "income" });
+      invalidateCats();
+      setForm((f) => ({ ...f, categoryId: cat.id }));
+    },
+    onError: () =>
+      toast({ title: "Erro ao criar categoria", variant: "destructive" }),
+  });
+
+  const createAccMutation = useMutation({
+    mutationFn: (payload: { name: string; type: string; balance?: number }) =>
+      financeService.createAccount(payload),
+    onSuccess: (acc: ApiFinanceAccount) => {
+      toast({ title: "Conta criada" });
+      setAccDialogOpen(false);
+      setAccForm({ name: "", type: "checking", balance: "" });
+      invalidateAccs();
+      setForm((f) => ({ ...f, accountId: acc.id }));
+    },
+    onError: () =>
+      toast({ title: "Erro ao criar conta", variant: "destructive" }),
+  });
 
   const filtered = entries.filter((e) => {
     const matchType = typeFilter === "all" || e.type === typeFilter;
@@ -131,16 +223,16 @@ export default function FinanceiroPage() {
 
   const totalIncome = entries
     .filter((e) => e.type === "income" && e.status === "paid")
-    .reduce((s, e) => s + e.amount, 0);
+    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const totalExpense = entries
     .filter((e) => e.type === "expense" && e.status === "paid")
-    .reduce((s, e) => s + e.amount, 0);
+    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const pendingIncome = entries
     .filter((e) => e.type === "income" && e.status === "pending")
-    .reduce((s, e) => s + e.amount, 0);
+    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const pendingExpense = entries
     .filter((e) => e.type === "expense" && e.status === "pending")
-    .reduce((s, e) => s + e.amount, 0);
+    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
   const chartData = [
     { name: "Recebido", value: totalIncome, fill: "#22c55e" },
@@ -149,105 +241,87 @@ export default function FinanceiroPage() {
     { name: "A Pagar", value: pendingExpense, fill: "#fca5a5" },
   ];
 
+  const EMPTY_FORM = {
+    type: "income" as "income" | "expense",
+    description: "",
+    amount: "",
+    date: new Date().toISOString().split("T")[0],
+    categoryId: "",
+    accountId: "",
+    paymentMethod: "",
+    status: "pending",
+  };
+
   const openNew = () => {
     setEditingEntry(null);
-    setForm({
-      type: "income",
-      description: "",
-      amount: "",
-      dueDate: new Date().toISOString().split("T")[0],
-      categoryId: "",
-      accountId: "",
-      paymentMethod: "",
-      recurring: false,
-      recurringInterval: "monthly",
-    });
+    setForm({ ...EMPTY_FORM });
     setDialogOpen(true);
   };
 
-  const openEdit = (e: FinanceEntry) => {
+  const openEdit = (e: ApiFinanceEntry) => {
     setEditingEntry(e);
     setForm({
       type: e.type,
       description: e.description,
       amount: String(e.amount),
-      dueDate: e.dueDate.split("T")[0],
-      categoryId: e.categoryId ?? "",
-      accountId: e.accountId ?? "",
-      paymentMethod: e.paymentMethod ?? "",
-      recurring: e.recurring,
-      recurringInterval: (e.recurringInterval ?? "monthly") as
-        | "weekly"
-        | "monthly"
-        | "yearly",
+      date: e.due_date.split("T")[0],
+      categoryId: e.category_id ?? "",
+      accountId: e.account_id ?? "",
+      paymentMethod: e.payment_method ?? "",
+      status: e.status,
     });
     setDialogOpen(true);
   };
 
-  const handleSave = async () => {
-    if (!form.description || !form.amount) {
+  const handleSave = () => {
+    if (
+      !form.description ||
+      !form.amount ||
+      !form.categoryId ||
+      !form.accountId
+    ) {
       toast({
-        title: "Descrição e valor são obrigatórios",
+        title: "Descrição, valor, categoria e conta são obrigatórios",
         variant: "destructive",
       });
       return;
     }
-    const payload = {
+    const payload: StoreFinanceEntryPayload = {
       type: form.type,
       description: form.description,
       amount: parseFloat(form.amount),
-      dueDate: new Date(form.dueDate + "T12:00:00").toISOString(),
-      status: "pending" as const,
-      categoryId: form.categoryId,
-      accountId: form.accountId || undefined,
-      paymentMethod:
-        (form.paymentMethod as FinanceEntry["paymentMethod"]) || undefined,
-      recurring: form.recurring,
-      recurringInterval: form.recurring ? form.recurringInterval : undefined,
+      date: form.date,
+      status: form.status,
+      category_id: form.categoryId,
+      account_id: form.accountId,
+      payment_method: form.paymentMethod || undefined,
     };
     if (editingEntry) {
-      await financeEntriesDb.update(
-        editingEntry.id,
-        payload as Partial<FinanceEntry>,
-      );
-      toast({ title: "Lançamento atualizado" });
+      updateMutation.mutate({ id: editingEntry.id, payload });
     } else {
-      await financeEntriesDb.create({
-        ...payload,
-        categoryId: payload.categoryId,
-      });
-      toast({ title: "Lançamento criado" });
+      createMutation.mutate(payload);
     }
-    setDialogOpen(false);
-    load();
-  };
-
-  const handleMarkPaid = async (entry: FinanceEntry) => {
-    await financeEntriesDb.update(entry.id, {
-      status: "paid",
-      paidDate: new Date().toISOString(),
-    });
-    toast({ title: "Marcado como pago" });
-    load();
   };
 
   const handleExport = () => {
     exportToCSV(
       filtered.map((e) => ({
-        Data: formatDate(e.dueDate),
+        Data: formatDate(e.due_date),
         Tipo: e.type === "income" ? "Receita" : "Despesa",
         Descrição: e.description,
         Valor: e.amount,
         Status: statusLabels[e.status],
-        "Forma Pagamento": e.paymentMethod
-          ? paymentMethodLabels[e.paymentMethod]
+        "Forma Pagamento": e.payment_method
+          ? paymentMethodLabels[e.payment_method]
           : "",
+        Categoria: e.category?.name ?? "",
+        Conta: e.account?.name ?? "",
       })),
       "financeiro",
     );
   };
 
-  if (loading)
+  if (isLoading)
     return (
       <div className="flex items-center justify-center h-48">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -430,14 +504,14 @@ export default function FinanceiroPage() {
               {filtered.map((entry) => (
                 <TableRow key={entry.id}>
                   <TableCell className="text-sm">
-                    {formatDate(entry.dueDate)}
+                    {formatDate(entry.due_date)}
                   </TableCell>
                   <TableCell>
                     <p className="font-medium">{entry.description}</p>
-                    {entry.recurring && (
-                      <Badge variant="outline" className="text-xs">
-                        Recorrente
-                      </Badge>
+                    {entry.category && (
+                      <p className="text-xs text-muted-foreground">
+                        {entry.category.name}
+                      </p>
                     )}
                   </TableCell>
                   <TableCell>
@@ -453,7 +527,7 @@ export default function FinanceiroPage() {
                     className={`text-right font-bold ${entry.type === "income" ? "text-green-600" : "text-red-600"}`}
                   >
                     {entry.type === "expense" ? "-" : ""}
-                    {formatCurrency(entry.amount)}
+                    {formatCurrency(Number(entry.amount) || 0)}
                   </TableCell>
                   <TableCell>
                     <Badge variant={statusColors[entry.status]}>
@@ -461,8 +535,9 @@ export default function FinanceiroPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {entry.paymentMethod
-                      ? paymentMethodLabels[entry.paymentMethod]
+                    {entry.payment_method
+                      ? (paymentMethodLabels[entry.payment_method] ??
+                        entry.payment_method)
                       : "–"}
                   </TableCell>
                   <TableCell>
@@ -472,7 +547,7 @@ export default function FinanceiroPage() {
                           variant="ghost"
                           size="sm"
                           className="text-xs h-7"
-                          onClick={() => handleMarkPaid(entry)}
+                          onClick={() => markPaidMutation.mutate(entry.id)}
                         >
                           Pagar
                         </Button>
@@ -483,7 +558,18 @@ export default function FinanceiroPage() {
                         className="text-xs h-7"
                         onClick={() => openEdit(entry)}
                       >
-                        Editar
+                        <Pencil className="w-3 h-3 mr-1" /> Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-7 text-destructive hover:text-destructive"
+                        onClick={() => {
+                          if (confirm("Excluir lançamento?"))
+                            deleteMutation.mutate(entry.id);
+                        }}
+                      >
+                        <Trash2 className="w-3 h-3" />
                       </Button>
                     </div>
                   </TableCell>
@@ -522,12 +608,12 @@ export default function FinanceiroPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Vencimento</Label>
+                <Label>Data</Label>
                 <Input
                   type="date"
-                  value={form.dueDate}
+                  value={form.date}
                   onChange={(e) =>
-                    setForm((f) => ({ ...f, dueDate: e.target.value }))
+                    setForm((f) => ({ ...f, date: e.target.value }))
                   }
                 />
               </div>
@@ -572,7 +658,19 @@ export default function FinanceiroPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Categoria</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Categoria</Label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCatForm((f) => ({ ...f, type: form.type }));
+                      setCatDialogOpen(true);
+                    }}
+                    className="flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    <Plus className="w-3 h-3" /> Nova
+                  </button>
+                </div>
                 <Select
                   value={form.categoryId}
                   onValueChange={(v) =>
@@ -590,11 +688,26 @@ export default function FinanceiroPage() {
                           {c.name}
                         </SelectItem>
                       ))}
+                    {categories.filter((c) => c.type === form.type).length ===
+                      0 && (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">
+                        Nenhuma categoria. Clique em &quot;Nova&quot; acima.
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Conta</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Conta</Label>
+                  <button
+                    type="button"
+                    onClick={() => setAccDialogOpen(true)}
+                    className="flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    <Plus className="w-3 h-3" /> Nova
+                  </button>
+                </div>
                 <Select
                   value={form.accountId}
                   onValueChange={(v) =>
@@ -610,38 +723,30 @@ export default function FinanceiroPage() {
                         {a.name}
                       </SelectItem>
                     ))}
+                    {accounts.length === 0 && (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">
+                        Nenhuma conta. Clique em &quot;Nova&quot; acima.
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="col-span-2 flex items-center gap-3">
-                <Switch
-                  checked={form.recurring}
-                  onCheckedChange={(v) =>
-                    setForm((f) => ({ ...f, recurring: v }))
-                  }
-                  id="recurring"
-                />
-                <Label htmlFor="recurring">Lançamento recorrente</Label>
-                {form.recurring && (
-                  <Select
-                    value={form.recurringInterval}
-                    onValueChange={(v) =>
-                      setForm((f) => ({
-                        ...f,
-                        recurringInterval: v as "weekly" | "monthly" | "yearly",
-                      }))
-                    }
-                  >
-                    <SelectTrigger className="w-28">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="weekly">Semanal</SelectItem>
-                      <SelectItem value="monthly">Mensal</SelectItem>
-                      <SelectItem value="yearly">Anual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
+              <div className="col-span-2 space-y-1.5">
+                <Label>Status</Label>
+                <Select
+                  value={form.status}
+                  onValueChange={(v) => setForm((f) => ({ ...f, status: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value="paid">Pago</SelectItem>
+                    <SelectItem value="overdue">Vencido</SelectItem>
+                    <SelectItem value="cancelled">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
@@ -650,6 +755,137 @@ export default function FinanceiroPage() {
               Cancelar
             </Button>
             <Button onClick={handleSave}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Quick-add Category Dialog */}
+      <Dialog open={catDialogOpen} onOpenChange={setCatDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="w-4 h-4" /> Nova Categoria
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Nome *</Label>
+              <Input
+                value={catForm.name}
+                onChange={(e) =>
+                  setCatForm((f) => ({ ...f, name: e.target.value }))
+                }
+                placeholder="Ex: Consultas, Aluguel..."
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Tipo</Label>
+              <Select
+                value={catForm.type}
+                onValueChange={(v) =>
+                  setCatForm((f) => ({
+                    ...f,
+                    type: v as "income" | "expense",
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="income">Receita</SelectItem>
+                  <SelectItem value="expense">Despesa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCatDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={!catForm.name.trim() || createCatMutation.isPending}
+              onClick={() =>
+                createCatMutation.mutate({
+                  name: catForm.name.trim(),
+                  type: catForm.type,
+                })
+              }
+            >
+              Criar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick-add Account Dialog */}
+      <Dialog open={accDialogOpen} onOpenChange={setAccDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Landmark className="w-4 h-4" /> Nova Conta
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Nome *</Label>
+              <Input
+                value={accForm.name}
+                onChange={(e) =>
+                  setAccForm((f) => ({ ...f, name: e.target.value }))
+                }
+                placeholder="Ex: Caixa, Banco Itaú..."
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Tipo</Label>
+              <Select
+                value={accForm.type}
+                onValueChange={(v) => setAccForm((f) => ({ ...f, type: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="checking">Conta Corrente</SelectItem>
+                  <SelectItem value="savings">Poupança</SelectItem>
+                  <SelectItem value="cash">Caixa (Dinheiro)</SelectItem>
+                  <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Saldo inicial</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={accForm.balance}
+                onChange={(e) =>
+                  setAccForm((f) => ({ ...f, balance: e.target.value }))
+                }
+                placeholder="0,00"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAccDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={!accForm.name.trim() || createAccMutation.isPending}
+              onClick={() =>
+                createAccMutation.mutate({
+                  name: accForm.name.trim(),
+                  type: accForm.type,
+                  balance: accForm.balance
+                    ? parseFloat(accForm.balance)
+                    : undefined,
+                })
+              }
+            >
+              Criar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

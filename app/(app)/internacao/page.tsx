@@ -1,20 +1,15 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import {
   Plus,
   BedDouble,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
-  XCircle,
-  ChevronDown,
-  ChevronUp,
   Syringe,
-  User2,
   Trash2,
-  Pencil,
-  Check,
-  X,
+  CheckSquare,
+  Square,
+  Clock,
+  CheckCheck,
+  History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,24 +32,19 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  hospitalizationsDb,
-  boxesDb,
-  petsDb,
-  clientsDb,
-  usersDb,
-} from "@/mocks/db";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { hospitalizationService } from "@/services/hospitalization.service";
+import { boxService, type StoreBoxPayload } from "@/services/box.service";
+import { petService } from "@/services/pet.service";
+import { userService } from "@/services/user.service";
 import type {
-  Hospitalization,
-  Box,
-  Pet,
-  Client,
-  User,
-  HospPrescription,
-  MedAdministration,
-} from "@/types";
-import { formatDate, formatDateTime, generateId } from "@/lib/utils";
+  ApiHospitalization,
+  ApiHospPrescription,
+  ApiBox,
+  ApiPet,
+  ApiUser,
+} from "@/types/api";
+import { formatDate, formatDateTime } from "@/lib/utils";
 import { useSessionStore } from "@/stores/session";
 import { useToast } from "@/hooks/use-toast";
 
@@ -74,7 +64,6 @@ const statusLabels: Record<string, string> = {
   deceased: "Óbito",
 };
 
-// Parse frequency string like "8/8h", "6/6h", "12/12h", "24/24h", "SID", "BID", "TID", "QID"
 function parseFrequencyHours(freq: string): number {
   const lower = freq.toLowerCase().trim();
   if (lower === "sid" || lower === "1x/dia" || lower === "24/24h") return 24;
@@ -85,43 +74,15 @@ function parseFrequencyHours(freq: string): number {
   if (match) return parseInt(match[2]);
   const hMatch = lower.match(/(\d+)h/);
   if (hMatch) return parseInt(hMatch[1]);
-  return 8; // default
-}
-
-function buildAdministrations(
-  startDate: string,
-  frequencyHours: number,
-  daysAhead = 3,
-): MedAdministration[] {
-  const admins: MedAdministration[] = [];
-  const start = new Date(startDate);
-  const end = new Date(start.getTime() + daysAhead * 24 * 60 * 60 * 1000);
-  let current = new Date(start);
-  while (current <= end) {
-    const scheduledTime = current.toISOString();
-    const now = new Date();
-    admins.push({
-      id: generateId(),
-      scheduledTime,
-      status: current < now ? "late" : "pending",
-    });
-    current = new Date(current.getTime() + frequencyHours * 60 * 60 * 1000);
-  }
-  return admins;
+  return 8;
 }
 
 export default function InternacaoPage() {
   const { toast } = useToast();
   const { user: currentUser } = useSessionStore();
-  const [hospitalizations, setHospitalizations] = useState<Hospitalization[]>(
-    [],
-  );
-  const [boxes, setBoxes] = useState<Box[]>([]);
-  const [pets, setPets] = useState<Pet[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [vets, setVets] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<Hospitalization | null>(null);
+  const qc = useQueryClient();
+
+  const [selected, setSelected] = useState<ApiHospitalization | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({
     petId: "",
@@ -141,59 +102,251 @@ export default function InternacaoPage() {
   });
   const [prescDialogOpen, setPrescDialogOpen] = useState(false);
   const [expandedPresc, setExpandedPresc] = useState<string | null>(null);
-  const [adminDialog, setAdminDialog] = useState<{
-    presc: HospPrescription;
-    admin: MedAdministration;
+  const [confirmingDose, setConfirmingDose] = useState<{
+    presc: ApiHospPrescription;
+    slotTime: Date;
   } | null>(null);
-  const [adminForm, setAdminForm] = useState({
-    administeredBy: "",
-    administeredAt: "",
-    notes: "",
-    skipped: false,
-  });
-  // inline edit of a scheduled time before it is administered
-  const [editingDose, setEditingDose] = useState<{
-    prescId: string;
-    adminId: string;
-    value: string;
-  } | null>(null);
+  const [doseNotes, setDoseNotes] = useState("");
+  const [boxDialogOpen, setBoxDialogOpen] = useState(false);
+  const [editingBox, setEditingBox] = useState<ApiBox | null>(null);
+  const [boxForm, setBoxForm] = useState<StoreBoxPayload & { active: boolean }>(
+    { name: "", size: "P", location: "", notes: "", active: true },
+  );
+  const isAutonomous = currentUser?.accountType === "autonomous";
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [hosps, bxs, pts, cls, usrs] = await Promise.all([
-      hospitalizationsDb.findAll(),
-      boxesDb.findAll(),
-      petsDb.findAll(),
-      clientsDb.findAll(),
-      usersDb.findWhere((u) => u.role === "vet"),
-    ]);
-    setHospitalizations(
-      hosps.sort(
+  const { data: hospitalizations = [], isLoading: loadingHosps } = useQuery({
+    queryKey: ["hospitalizations"],
+    queryFn: () => hospitalizationService.list(),
+    select: (data: ApiHospitalization[]) =>
+      [...data].sort(
         (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       ),
-    );
-    setBoxes(bxs);
-    setPets(pts);
-    setClients(cls);
-    setVets(usrs);
-    setLoading(false);
-  }, []);
+  });
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { data: boxes = [] } = useQuery({
+    queryKey: ["boxes"],
+    queryFn: () => boxService.list(),
+    select: (data: ApiBox[]) => data.filter((b) => b.active),
+  });
 
-  const refreshSelected = useCallback(async (id: string) => {
-    const h = await hospitalizationsDb.findById(id);
-    if (h) setSelected(h);
-  }, []);
+  const { data: pets = [] } = useQuery({
+    queryKey: ["pets"],
+    queryFn: () => petService.list(),
+    select: (data: ApiPet[]) => data,
+  });
+
+  const { data: allUsers = [] } = useQuery({
+    queryKey: ["users", "all"],
+    queryFn: () => userService.list(),
+    enabled: !isAutonomous,
+  });
+
+  const vets = isAutonomous
+    ? currentUser
+      ? [
+          {
+            id: currentUser.id,
+            name: currentUser.name,
+            email: "",
+            role: "vet",
+            account_type: "autonomous",
+            clinic_id: null,
+            phone: null,
+            avatar: null,
+            active: true,
+            clinic: null,
+            created_at: "",
+            updated_at: "",
+          } as ApiUser,
+        ]
+      : []
+    : allUsers;
+
+  const loading = loadingHosps;
+
+  const invalidateHosps = () =>
+    qc.invalidateQueries({ queryKey: ["hospitalizations"] });
+  const invalidateBoxes = () => qc.invalidateQueries({ queryKey: ["boxes"] });
+  const invalidate = invalidateHosps;
+
+  const createBoxMutation = useMutation({
+    mutationFn: boxService.create,
+    onSuccess: () => {
+      toast({ title: editingBox ? "Box atualizado" : "Box criado" });
+      setBoxDialogOpen(false);
+      invalidateBoxes();
+    },
+    onError: () =>
+      toast({ title: "Erro ao salvar box", variant: "destructive" }),
+  });
+
+  const updateBoxMutation = useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: Partial<StoreBoxPayload & { active: boolean }>;
+    }) => boxService.update(id, payload),
+    onSuccess: () => {
+      toast({ title: "Box atualizado" });
+      setBoxDialogOpen(false);
+      invalidateBoxes();
+    },
+    onError: () =>
+      toast({ title: "Erro ao atualizar box", variant: "destructive" }),
+  });
+
+  const deleteBoxMutation = useMutation({
+    mutationFn: boxService.delete,
+    onSuccess: () => {
+      toast({ title: "Box excluído" });
+      invalidateBoxes();
+    },
+    onError: () =>
+      toast({ title: "Erro ao excluir box", variant: "destructive" }),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: hospitalizationService.create,
+    onSuccess: () => {
+      toast({ title: "Internação registrada" });
+      setDialogOpen(false);
+      invalidate();
+    },
+    onError: () =>
+      toast({ title: "Erro ao registrar internação", variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: Parameters<typeof hospitalizationService.update>[1];
+    }) => hospitalizationService.update(id, payload),
+    onSuccess: (updated) => {
+      invalidate();
+      if (selected?.id === updated.id) setSelected(updated);
+    },
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      hospitalizationService.updateStatus(id, status),
+    onSuccess: (updated) => {
+      invalidate();
+      if (selected?.id === updated.id) setSelected(updated);
+    },
+  });
+
+  const addPrescMutation = useMutation({
+    mutationFn: ({
+      hospId,
+      payload,
+    }: {
+      hospId: string;
+      payload: Parameters<typeof hospitalizationService.addPrescription>[1];
+    }) => hospitalizationService.addPrescription(hospId, payload),
+    onSuccess: () => {
+      toast({ title: "Prescrição adicionada" });
+      setPrescDialogOpen(false);
+      setPrescForm({
+        medication: "",
+        dosage: "",
+        route: "",
+        frequency: "",
+        notes: "",
+        daysAhead: "3",
+      });
+      invalidate();
+    },
+    onError: () =>
+      toast({ title: "Erro ao adicionar prescrição", variant: "destructive" }),
+  });
+
+  const confirmDoseMutation = useMutation({
+    mutationFn: ({
+      hospId,
+      prescId,
+      administeredAt,
+      notes,
+    }: {
+      hospId: string;
+      prescId: string;
+      administeredAt: string;
+      notes?: string;
+    }) =>
+      hospitalizationService.addAdministration(hospId, prescId, {
+        administered_at: administeredAt,
+        administered_by: currentUser?.name ?? currentUser?.id ?? "Equipe",
+        notes,
+      }),
+    onSuccess: () => {
+      toast({
+        title: "Dose confirmada!",
+        description: "Administração registrada com sucesso",
+      });
+      setConfirmingDose(null);
+      setDoseNotes("");
+      invalidate();
+    },
+    onError: () =>
+      toast({ title: "Erro ao confirmar dose", variant: "destructive" }),
+  });
+
+  const deletePrescMutation = useMutation({
+    mutationFn: ({ hospId, prescId }: { hospId: string; prescId: string }) =>
+      hospitalizationService.deletePrescription(hospId, prescId),
+    onSuccess: () => {
+      toast({ title: "Prescrição excluída" });
+      setExpandedPresc(null);
+      invalidate();
+    },
+  });
+
+  const openNewBox = () => {
+    setEditingBox(null);
+    setBoxForm({ name: "", size: "P", location: "", notes: "", active: true });
+    setBoxDialogOpen(true);
+  };
+
+  const openEditBox = (b: ApiBox) => {
+    setEditingBox(b);
+    setBoxForm({
+      name: b.name,
+      size: b.size ?? "P",
+      location: b.location ?? "",
+      notes: b.notes ?? "",
+      active: b.active,
+    });
+    setBoxDialogOpen(true);
+  };
+
+  const handleSaveBox = () => {
+    if (!boxForm.name.trim()) {
+      toast({ title: "Nome do box é obrigatório", variant: "destructive" });
+      return;
+    }
+    if (editingBox) {
+      updateBoxMutation.mutate({ id: editingBox.id, payload: boxForm });
+    } else {
+      createBoxMutation.mutate({
+        name: boxForm.name,
+        size: boxForm.size,
+        location: boxForm.location || undefined,
+        notes: boxForm.notes || undefined,
+      });
+    }
+  };
 
   const openNew = () => {
     setForm({
       petId: "",
       clientId: "",
-      vetId: "",
+      vetId: isAutonomous && currentUser ? currentUser.id : "",
       boxId: "",
       reason: "",
       notes: "",
@@ -201,224 +354,71 @@ export default function InternacaoPage() {
     setDialogOpen(true);
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!form.petId || !form.reason) {
       toast({ title: "Pet e motivo são obrigatórios", variant: "destructive" });
       return;
     }
-    await hospitalizationsDb.create({
-      petId: form.petId,
-      clientId: form.clientId,
-      vetId: form.vetId || undefined,
+    const pet = pets.find((p) => p.id === form.petId);
+    createMutation.mutate({
+      pet_id: form.petId,
+      client_id: form.clientId || pet?.client?.id || undefined,
+      vet_id: form.vetId || undefined,
+      box_id: form.boxId || undefined,
       status: "active",
-      admissionDate: new Date().toISOString(),
-      boxId: form.boxId || undefined,
+      admission_date: new Date().toISOString().split("T")[0],
       reason: form.reason,
       notes: form.notes || undefined,
-      prescriptions: [],
-      checklistItems: [],
     });
-    toast({ title: "Internação registrada" });
-    setDialogOpen(false);
-    load();
   };
 
-  const handleDischarge = async (h: Hospitalization) => {
+  const handleDischarge = (h: ApiHospitalization) => {
     if (!confirm("Dar alta a este animal?")) return;
-    await hospitalizationsDb.update(h.id, {
-      status: "discharged",
-      dischargeDate: new Date().toISOString(),
-    });
+    statusMutation.mutate({ id: h.id, status: "discharged" });
     toast({ title: "Alta registrada" });
-    load();
     if (selected?.id === h.id) setSelected(null);
   };
 
-  const handleCancel = async (h: Hospitalization) => {
+  const handleCancel = (h: ApiHospitalization) => {
     if (!confirm("Cancelar esta internação?")) return;
-    await hospitalizationsDb.update(h.id, { status: "cancelled" });
+    statusMutation.mutate({ id: h.id, status: "cancelled" });
     toast({ title: "Internação cancelada" });
-    load();
     if (selected?.id === h.id) setSelected(null);
   };
 
-  const handleReopen = async (h: Hospitalization) => {
-    await hospitalizationsDb.update(h.id, {
-      status: "active",
-      dischargeDate: undefined,
-    });
+  const handleReopen = (h: ApiHospitalization) => {
+    statusMutation.mutate({ id: h.id, status: "active" });
     toast({ title: "Internação reaberta" });
-    load();
   };
 
-  const handleMoveBox = async (h: Hospitalization, boxId: string) => {
-    await hospitalizationsDb.update(h.id, { boxId });
+  const handleMoveBox = (h: ApiHospitalization, boxId: string) => {
+    updateMutation.mutate({ id: h.id, payload: { box_id: boxId } });
     toast({ title: "Box atualizado" });
-    load();
-    refreshSelected(h.id);
   };
 
-  const handleAddPrescription = async () => {
+  const handleAddPrescription = () => {
     if (!selected || !prescForm.medication) return;
-    const startDate = new Date().toISOString();
-    const freqHours = parseFrequencyHours(prescForm.frequency || "8/8h");
-    const days = parseInt(prescForm.daysAhead) || 3;
-    const administrations = buildAdministrations(startDate, freqHours, days);
-    const newPresc: HospPrescription = {
-      id: generateId(),
-      medication: prescForm.medication,
-      dosage: prescForm.dosage,
-      route: prescForm.route || undefined,
-      frequency: prescForm.frequency,
-      startDate,
-      active: true,
-      notes: prescForm.notes || undefined,
-      administrations,
-    };
-    const updatedPrescriptions = [...selected.prescriptions, newPresc];
-    await hospitalizationsDb.update(selected.id, {
-      prescriptions: updatedPrescriptions,
+    addPrescMutation.mutate({
+      hospId: selected.id,
+      payload: {
+        medication: prescForm.medication,
+        dosage: prescForm.dosage,
+        frequency: prescForm.frequency || "8/8h",
+        route: prescForm.route || undefined,
+        start_date: new Date().toISOString(),
+        notes: prescForm.notes || undefined,
+      },
     });
-    toast({
-      title: "Prescrição adicionada",
-      description: `${administrations.length} doses agendadas`,
-    });
-    setPrescDialogOpen(false);
-    setPrescForm({
-      medication: "",
-      dosage: "",
-      route: "",
-      frequency: "",
-      notes: "",
-      daysAhead: "3",
-    });
-    refreshSelected(selected.id);
-    load();
   };
 
-  const handleDeletePrescription = async (prescId: string) => {
+  const handleDeletePrescription = (prescId: string) => {
     if (!selected) return;
-    if (!confirm("Excluir esta prescrição e todas as doses agendadas?")) return;
-    const updatedPrescriptions = selected.prescriptions.filter(
-      (p) => p.id !== prescId,
-    );
-    await hospitalizationsDb.update(selected.id, {
-      prescriptions: updatedPrescriptions,
-    });
-    toast({ title: "Prescrição excluída" });
-    setExpandedPresc(null);
-    refreshSelected(selected.id);
-    load();
+    if (!confirm("Excluir esta prescrição?")) return;
+    deletePrescMutation.mutate({ hospId: selected.id, prescId });
   };
 
-  const handleRegisterAdmin = async () => {
-    if (!selected || !adminDialog) return;
-    if (!adminForm.skipped && !adminForm.administeredBy) {
-      toast({ title: "Informe quem administrou", variant: "destructive" });
-      return;
-    }
-    if (!adminForm.skipped && !adminForm.administeredAt) {
-      toast({
-        title: "Informe a hora da administração",
-        variant: "destructive",
-      });
-      return;
-    }
-    const { presc, admin } = adminDialog;
-    const administeredAt = adminForm.administeredAt
-      ? new Date(adminForm.administeredAt).toISOString()
-      : new Date().toISOString();
-    const updatedAdmin: MedAdministration = {
-      ...admin,
-      administeredAt,
-      administeredBy:
-        adminForm.administeredBy || currentUser?.name || "Desconhecido",
-      notes: adminForm.notes || undefined,
-      status: adminForm.skipped ? "skipped" : "done",
-    };
-    const updatedPrescriptions = selected.prescriptions.map((p) =>
-      p.id === presc.id
-        ? {
-            ...p,
-            administrations: p.administrations.map((a) =>
-              a.id === admin.id ? updatedAdmin : a,
-            ),
-          }
-        : p,
-    );
-    // Also refresh late status on remaining pending
-    const nowMs = Date.now();
-    const refreshed = updatedPrescriptions.map((p) => ({
-      ...p,
-      administrations: p.administrations.map((a) =>
-        a.status === "pending" && new Date(a.scheduledTime).getTime() < nowMs
-          ? { ...a, status: "late" as const }
-          : a,
-      ),
-    }));
-    await hospitalizationsDb.update(selected.id, { prescriptions: refreshed });
-    toast({
-      title: adminForm.skipped ? "Dose pulada" : "Administração registrada",
-    });
-    setAdminDialog(null);
-    setAdminForm({
-      administeredBy: "",
-      administeredAt: "",
-      notes: "",
-      skipped: false,
-    });
-    refreshSelected(selected.id);
-    load();
-  };
-
-  const handleEditScheduledTime = async (
-    prescId: string,
-    adminId: string,
-    newTime: string,
-  ) => {
-    if (!selected || !newTime) return;
-    const updated = selected.prescriptions.map((p) =>
-      p.id === prescId
-        ? {
-            ...p,
-            administrations: p.administrations.map((a) =>
-              a.id === adminId
-                ? {
-                    ...a,
-                    scheduledTime: new Date(newTime).toISOString(),
-                    status:
-                      new Date(newTime) < new Date()
-                        ? ("late" as const)
-                        : ("pending" as const),
-                  }
-                : a,
-            ),
-          }
-        : p,
-    );
-    await hospitalizationsDb.update(selected.id, { prescriptions: updated });
-    setEditingDose(null);
-    refreshSelected(selected.id);
-  };
-
-  const handleDeleteDose = async (prescId: string, adminId: string) => {
-    if (!selected) return;
-    const updated = selected.prescriptions.map((p) =>
-      p.id === prescId
-        ? {
-            ...p,
-            administrations: p.administrations.filter((a) => a.id !== adminId),
-          }
-        : p,
-    );
-    await hospitalizationsDb.update(selected.id, { prescriptions: updated });
-    refreshSelected(selected.id);
-    load();
-  };
-
-  const getPet = (id: string) => pets.find((p) => p.id === id);
-  const getClient = (id: string) => clients.find((c) => c.id === id);
-  const getBox = (id?: string) => boxes.find((b) => b.id === id);
+  const getPet = (id: string) => pets.find((p: ApiPet) => p.id === id);
+  const getBox = (id?: string | null) => boxes.find((b: ApiBox) => b.id === id);
 
   const active = hospitalizations.filter((h) => h.status === "active");
   const others = hospitalizations.filter((h) => h.status !== "active");
@@ -451,7 +451,7 @@ export default function InternacaoPage() {
           {
             label: "Alta hoje",
             value: others.filter((h) =>
-              h.dischargeDate?.startsWith(
+              h.discharge_date?.startsWith(
                 new Date().toISOString().split("T")[0],
               ),
             ).length,
@@ -460,7 +460,7 @@ export default function InternacaoPage() {
           {
             label: "Boxes livres",
             value: boxes.filter(
-              (b) => b.active && !active.find((h) => h.boxId === b.id),
+              (b) => b.active && !active.find((h) => h.box_id === b.id),
             ).length,
             color: "text-purple-600",
           },
@@ -493,9 +493,8 @@ export default function InternacaoPage() {
             </Card>
           )}
           {active.map((h) => {
-            const pet = getPet(h.petId);
-            const client = getClient(h.clientId);
-            const box = getBox(h.boxId);
+            const pet = getPet(h.pet_id);
+            const box = getBox(h.box_id);
             return (
               <Card
                 key={h.id}
@@ -505,12 +504,15 @@ export default function InternacaoPage() {
                 <CardContent className="p-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="font-medium">{pet?.name ?? "–"}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {client?.name}
+                      <p className="font-medium">
+                        {h.pet?.name ?? pet?.name ?? "–"}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {box?.name ?? "Sem box"} • {formatDate(h.admissionDate)}
+                        {h.client?.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {box?.name ?? h.box?.name ?? "Sem box"} •{" "}
+                        {formatDate(h.admission_date)}
                       </p>
                     </div>
                     <Badge variant="info">Internado</Badge>
@@ -526,7 +528,7 @@ export default function InternacaoPage() {
             Histórico
           </p>
           {others.slice(0, 5).map((h) => {
-            const pet = getPet(h.petId);
+            const pet = getPet(h.pet_id);
             return (
               <Card
                 key={h.id}
@@ -535,14 +537,16 @@ export default function InternacaoPage() {
               >
                 <CardContent className="p-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">{pet?.name ?? "–"}</p>
+                    <p className="text-sm font-medium">
+                      {h.pet?.name ?? pet?.name ?? "–"}
+                    </p>
                     <Badge variant={statusColors[h.status]}>
                       {statusLabels[h.status]}
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {formatDate(h.admissionDate)}{" "}
-                    {h.dischargeDate && `→ ${formatDate(h.dischargeDate)}`}
+                    {formatDate(h.admission_date)}{" "}
+                    {h.discharge_date && `→ ${formatDate(h.discharge_date)}`}
                   </p>
                 </CardContent>
               </Card>
@@ -564,9 +568,13 @@ export default function InternacaoPage() {
               <CardHeader>
                 <div className="flex items-start justify-between flex-wrap gap-2">
                   <div>
-                    <CardTitle>{getPet(selected.petId)?.name ?? "–"}</CardTitle>
+                    <CardTitle>
+                      {selected.pet?.name ??
+                        getPet(selected.pet_id)?.name ??
+                        "–"}
+                    </CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      {getClient(selected.clientId)?.name}
+                      {selected.client?.name}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -576,7 +584,7 @@ export default function InternacaoPage() {
                     {selected.status === "active" && (
                       <>
                         <Select
-                          value={selected.boxId ?? ""}
+                          value={selected.box_id ?? ""}
                           onValueChange={(v) => handleMoveBox(selected, v)}
                         >
                           <SelectTrigger className="w-32 h-8 text-xs">
@@ -625,7 +633,7 @@ export default function InternacaoPage() {
                   <TabsList className="mb-4">
                     <TabsTrigger value="info">Informações</TabsTrigger>
                     <TabsTrigger value="prescricoes">
-                      Prescrições ({selected.prescriptions.length})
+                      Prescrições ({selected.prescriptions?.length ?? 0})
                     </TabsTrigger>
                   </TabsList>
 
@@ -634,27 +642,32 @@ export default function InternacaoPage() {
                       <div>
                         <p className="text-muted-foreground">Admissão</p>
                         <p className="font-medium">
-                          {formatDateTime(selected.admissionDate)}
+                          {formatDateTime(selected.admission_date)}
                         </p>
                       </div>
-                      {selected.dischargeDate && (
+                      {selected.discharge_date && (
                         <div>
                           <p className="text-muted-foreground">Alta</p>
                           <p className="font-medium">
-                            {formatDateTime(selected.dischargeDate)}
+                            {formatDateTime(selected.discharge_date)}
                           </p>
                         </div>
                       )}
                       <div>
                         <p className="text-muted-foreground">Box</p>
                         <p className="font-medium">
-                          {getBox(selected.boxId)?.name ?? "–"}
+                          {selected.box?.name ??
+                            getBox(selected.box_id)?.name ??
+                            "–"}
                         </p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Veterinário</p>
                         <p className="font-medium">
-                          {vets.find((v) => v.id === selected.vetId)?.name ??
+                          {selected.vet?.name ??
+                            (vets as ApiUser[]).find(
+                              (v) => v.id === selected.vet_id,
+                            )?.name ??
                             "–"}
                         </p>
                       </div>
@@ -680,323 +693,244 @@ export default function InternacaoPage() {
                         <Plus className="w-4 h-4" /> Adicionar Prescrição
                       </Button>
                     )}
-                    {selected.prescriptions.length === 0 ? (
+                    {(selected.prescriptions?.length ?? 0) === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-6">
-                        Nenhuma prescrição
+                        Nenhuma prescrição cadastrada
                       </p>
                     ) : (
-                      <div className="space-y-3">
-                        {selected.prescriptions.map((p) => {
+                      <div className="space-y-4">
+                        {(selected.prescriptions ?? []).map((p) => {
+                          const freqH = parseFrequencyHours(p.frequency);
+                          const start = new Date(p.start_date);
+                          const end = p.end_date ? new Date(p.end_date) : null;
+                          const now = new Date();
+
+                          // Generate all dose slots from start up to now+freqH
+                          const slots: Date[] = [];
+                          const cursor = new Date(start);
+                          // align start to nearest dose slot
+                          while (
+                            cursor <= new Date(now.getTime() + freqH * 3600_000)
+                          ) {
+                            if (!end || cursor <= end) {
+                              slots.push(new Date(cursor));
+                            }
+                            cursor.setHours(cursor.getHours() + freqH);
+                          }
+
+                          // Administrations already done
                           const admins = p.administrations ?? [];
-                          const pending = admins.filter(
-                            (a) => a.status === "pending",
-                          ).length;
-                          const late = admins.filter(
-                            (a) => a.status === "late",
-                          ).length;
-                          const done = admins.filter(
-                            (a) => a.status === "done",
-                          ).length;
+
+                          // For each slot, check if an admin exists within ±(freqH/2) hours
+                          const tolerance = (freqH / 2) * 3600_000;
+                          const slotsWithStatus = slots.map((slot) => {
+                            const given = admins.find(
+                              (a) =>
+                                Math.abs(
+                                  new Date(a.administered_at).getTime() -
+                                    slot.getTime(),
+                                ) <= tolerance,
+                            );
+                            return { slot, given: given ?? null };
+                          });
+
+                          // Show only past/current slots (up to now)
+                          const pastSlots = slotsWithStatus.filter(
+                            (s) => s.slot <= now,
+                          );
                           const isExpanded = expandedPresc === p.id;
+                          const doneCount = pastSlots.filter(
+                            (s) => s.given,
+                          ).length;
+                          const totalPast = pastSlots.length;
+
                           return (
                             <div
                               key={p.id}
-                              className={`rounded-lg border ${p.active ? "border-blue-200" : "border-muted opacity-60"}`}
+                              className="rounded-lg border border-blue-200 overflow-hidden"
                             >
                               {/* Header */}
-                              <div
-                                className={`flex items-start justify-between p-3 cursor-pointer ${p.active ? "bg-blue-50" : "bg-muted"} rounded-t-lg`}
-                                onClick={() =>
-                                  setExpandedPresc(isExpanded ? null : p.id)
-                                }
-                              >
+                              <div className="flex items-start gap-3 p-3 bg-blue-50">
+                                <Syringe className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <Syringe className="w-4 h-4 text-blue-600 shrink-0" />
-                                    <p className="font-semibold text-sm">
-                                      {p.medication}
-                                    </p>
-                                    {!p.active && (
-                                      <Badge variant="secondary">Inativo</Badge>
-                                    )}
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <p className="font-semibold text-sm">
+                                        {p.medication}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {p.dosage}
+                                        {p.route ? ` • ${p.route}` : ""} •{" "}
+                                        {p.frequency}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {formatDate(p.start_date)}
+                                        {p.end_date
+                                          ? ` – ${formatDate(p.end_date)}`
+                                          : ""}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {totalPast > 0 && (
+                                        <span
+                                          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                                            doneCount === totalPast
+                                              ? "bg-green-100 text-green-700"
+                                              : "bg-amber-100 text-amber-700"
+                                          }`}
+                                        >
+                                          {doneCount}/{totalPast}
+                                        </span>
+                                      )}
+                                      {selected.status === "active" && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                          onClick={() =>
+                                            handleDeletePrescription(p.id)
+                                          }
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </Button>
+                                      )}
+                                      <button
+                                        onClick={() =>
+                                          setExpandedPresc(
+                                            isExpanded ? null : p.id,
+                                          )
+                                        }
+                                        className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground px-1"
+                                      >
+                                        <History className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
                                   </div>
-                                  <p className="text-xs text-muted-foreground mt-0.5">
-                                    {p.dosage}
-                                    {p.route ? ` • ${p.route}` : ""} •{" "}
-                                    {p.frequency}
-                                  </p>
-                                  {p.notes && (
-                                    <p className="text-xs text-muted-foreground">
-                                      {p.notes}
-                                    </p>
-                                  )}
-                                  {/* Mini counters */}
-                                  <div className="flex items-center gap-3 mt-1.5">
-                                    {late > 0 && (
-                                      <span className="flex items-center gap-1 text-xs text-red-600 font-medium">
-                                        <AlertCircle className="w-3 h-3" />{" "}
-                                        {late} atrasada{late > 1 ? "s" : ""}
-                                      </span>
-                                    )}
-                                    {pending > 0 && (
-                                      <span className="flex items-center gap-1 text-xs text-amber-600">
-                                        <Clock className="w-3 h-3" /> {pending}{" "}
-                                        pendente{pending > 1 ? "s" : ""}
-                                      </span>
-                                    )}
-                                    {done > 0 && (
-                                      <span className="flex items-center gap-1 text-xs text-green-600">
-                                        <CheckCircle2 className="w-3 h-3" />{" "}
-                                        {done} administrada{done > 1 ? "s" : ""}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="ml-2 shrink-0 flex items-center gap-1">
-                                  {selected.status === "active" && (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeletePrescription(p.id);
-                                      }}
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </Button>
-                                  )}
-                                  {isExpanded ? (
-                                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                                  ) : (
-                                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                                  )}
                                 </div>
                               </div>
 
-                              {/* Dose checklist */}
-                              {isExpanded && (
-                                <div className="divide-y border-t">
-                                  {admins.length === 0 && (
-                                    <p className="text-xs text-muted-foreground text-center py-4">
-                                      Nenhuma dose agendada
-                                    </p>
-                                  )}
-                                  {admins.map((a) => {
-                                    const isPending = a.status === "pending";
-                                    const isLate = a.status === "late";
-                                    const isDone = a.status === "done";
-                                    const isSkipped = a.status === "skipped";
-                                    const isEditingThis =
-                                      editingDose?.prescId === p.id &&
-                                      editingDose?.adminId === a.id;
-                                    const canAct =
-                                      (isPending || isLate) &&
-                                      selected.status === "active";
+                              {/* Dose slots */}
+                              {pastSlots.length === 0 ? (
+                                <div className="px-4 py-3 text-xs text-muted-foreground">
+                                  Nenhuma dose programada até agora
+                                </div>
+                              ) : (
+                                <div className="divide-y">
+                                  {pastSlots.map(({ slot, given }, idx) => {
+                                    const isPast = slot < now;
+                                    const isLate = isPast && !given;
                                     return (
                                       <div
-                                        key={a.id}
-                                        className={`flex items-start gap-2 px-3 py-2.5 ${
-                                          isDone
+                                        key={idx}
+                                        className={`flex items-center gap-3 px-4 py-2.5 ${
+                                          given
                                             ? "bg-green-50"
                                             : isLate
                                               ? "bg-red-50"
-                                              : isSkipped
-                                                ? "bg-gray-50"
-                                                : "bg-white"
+                                              : "bg-white"
                                         }`}
                                       >
-                                        {/* Status icon */}
-                                        <div className="mt-0.5 shrink-0">
-                                          {isDone && (
-                                            <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                          )}
-                                          {isLate && (
-                                            <AlertCircle className="w-4 h-4 text-red-500" />
-                                          )}
-                                          {isPending && (
-                                            <Clock className="w-4 h-4 text-amber-500" />
-                                          )}
-                                          {isSkipped && (
-                                            <XCircle className="w-4 h-4 text-gray-400" />
-                                          )}
-                                        </div>
-
-                                        {/* Time + info */}
-                                        <div className="flex-1 min-w-0 space-y-0.5">
-                                          {/* Scheduled time — editable if pending/late */}
-                                          {isEditingThis ? (
-                                            <div className="flex items-center gap-1">
-                                              <Input
-                                                type="datetime-local"
-                                                className="h-7 text-xs w-44"
-                                                value={editingDose.value}
-                                                onChange={(e) =>
-                                                  setEditingDose((d) =>
-                                                    d
-                                                      ? {
-                                                          ...d,
-                                                          value: e.target.value,
-                                                        }
-                                                      : d,
-                                                  )
-                                                }
-                                              />
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                className="h-7 w-7 p-0 text-green-600"
-                                                onClick={() =>
-                                                  handleEditScheduledTime(
-                                                    p.id,
-                                                    a.id,
-                                                    editingDose.value,
-                                                  )
-                                                }
-                                              >
-                                                <Check className="w-3.5 h-3.5" />
-                                              </Button>
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                className="h-7 w-7 p-0 text-muted-foreground"
-                                                onClick={() =>
-                                                  setEditingDose(null)
-                                                }
-                                              >
-                                                <X className="w-3.5 h-3.5" />
-                                              </Button>
-                                            </div>
+                                        <button
+                                          disabled={
+                                            !!given ||
+                                            selected.status !== "active" ||
+                                            confirmDoseMutation.isPending
+                                          }
+                                          onClick={() => {
+                                            setConfirmingDose({
+                                              presc: p,
+                                              slotTime: slot,
+                                            });
+                                            setDoseNotes("");
+                                          }}
+                                          className="shrink-0 disabled:opacity-60"
+                                        >
+                                          {given ? (
+                                            <CheckSquare className="w-5 h-5 text-green-600" />
                                           ) : (
-                                            <div className="flex items-center gap-1">
-                                              <span
-                                                className={`text-xs font-medium ${
-                                                  isLate
-                                                    ? "text-red-600"
-                                                    : isDone
-                                                      ? "text-green-700"
-                                                      : ""
-                                                }`}
-                                              >
-                                                Agendado:{" "}
-                                                {formatDateTime(
-                                                  a.scheduledTime,
-                                                )}
+                                            <Square className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
+                                          )}
+                                        </button>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <Clock className="w-3 h-3 text-muted-foreground" />
+                                            <span className="text-sm font-medium">
+                                              {slot.toLocaleTimeString(
+                                                "pt-BR",
+                                                {
+                                                  hour: "2-digit",
+                                                  minute: "2-digit",
+                                                },
+                                              )}
+                                              {" • "}
+                                              {slot.toLocaleDateString(
+                                                "pt-BR",
+                                                {
+                                                  day: "2-digit",
+                                                  month: "short",
+                                                },
+                                              )}
+                                            </span>
+                                            {isLate && (
+                                              <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-medium">
+                                                Atrasada
                                               </span>
-                                              {canAct && (
-                                                <button
-                                                  className="text-muted-foreground hover:text-foreground"
-                                                  onClick={() =>
-                                                    setEditingDose({
-                                                      prescId: p.id,
-                                                      adminId: a.id,
-                                                      value: new Date(
-                                                        a.scheduledTime,
-                                                      )
-                                                        .toLocaleString("sv")
-                                                        .slice(0, 16),
-                                                    })
-                                                  }
-                                                >
-                                                  <Pencil className="w-3 h-3" />
-                                                </button>
-                                              )}
-                                            </div>
-                                          )}
-
-                                          {/* Administration result */}
-                                          {isDone && (
-                                            <p className="text-xs text-green-700 flex items-center gap-1">
-                                              <User2 className="w-3 h-3" />
-                                              {a.administeredBy} •{" "}
-                                              {formatDateTime(
-                                                a.administeredAt!,
-                                              )}
-                                              {a.notes && ` • ${a.notes}`}
+                                            )}
+                                          </div>
+                                          {given && (
+                                            <p className="text-xs text-green-700 mt-0.5">
+                                              <CheckCheck className="w-3 h-3 inline mr-1" />
+                                              Administrado{" "}
+                                              {new Date(
+                                                given.administered_at,
+                                              ).toLocaleTimeString("pt-BR", {
+                                                hour: "2-digit",
+                                                minute: "2-digit",
+                                              })}
+                                              {" por "}
+                                              {given.administered_by}
+                                              {given.notes &&
+                                                ` • ${given.notes}`}
                                             </p>
-                                          )}
-                                          {isSkipped && (
-                                            <p className="text-xs text-gray-500 flex items-center gap-1">
-                                              <User2 className="w-3 h-3" />
-                                              Pulada por {a.administeredBy}
-                                              {a.notes && ` • ${a.notes}`}
-                                            </p>
-                                          )}
-                                          {isLate && (
-                                            <p className="text-xs text-red-600 font-semibold">
-                                              Atrasada — não registrada
-                                            </p>
-                                          )}
-                                        </div>
-
-                                        {/* Actions */}
-                                        <div className="flex items-center gap-1 shrink-0">
-                                          {isDone && (
-                                            <Badge className="text-xs bg-green-100 text-green-800 border-transparent">
-                                              OK
-                                            </Badge>
-                                          )}
-                                          {isLate && (
-                                            <Badge
-                                              variant="destructive"
-                                              className="text-xs"
-                                            >
-                                              Atrasada
-                                            </Badge>
-                                          )}
-                                          {isPending && (
-                                            <Badge className="text-xs bg-amber-100 text-amber-800 border-transparent">
-                                              Pendente
-                                            </Badge>
-                                          )}
-                                          {isSkipped && (
-                                            <Badge
-                                              variant="secondary"
-                                              className="text-xs"
-                                            >
-                                              Pulada
-                                            </Badge>
-                                          )}
-                                          {canAct && (
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              className="h-7 text-xs px-2"
-                                              onClick={() => {
-                                                setAdminForm({
-                                                  administeredBy:
-                                                    currentUser?.name ?? "",
-                                                  administeredAt: new Date()
-                                                    .toLocaleString("sv")
-                                                    .slice(0, 16),
-                                                  notes: "",
-                                                  skipped: false,
-                                                });
-                                                setAdminDialog({
-                                                  presc: p,
-                                                  admin: a,
-                                                });
-                                              }}
-                                            >
-                                              Registrar
-                                            </Button>
-                                          )}
-                                          {canAct && (
-                                            <Button
-                                              size="sm"
-                                              variant="ghost"
-                                              className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
-                                              onClick={() =>
-                                                handleDeleteDose(p.id, a.id)
-                                              }
-                                            >
-                                              <Trash2 className="w-3.5 h-3.5" />
-                                            </Button>
                                           )}
                                         </div>
                                       </div>
                                     );
                                   })}
+                                </div>
+                              )}
+
+                              {/* Expanded history: future slots */}
+                              {isExpanded && (
+                                <div className="border-t bg-muted/30 px-4 py-2 space-y-1">
+                                  <p className="text-xs font-semibold text-muted-foreground mb-2">
+                                    Próximas doses programadas
+                                  </p>
+                                  {slotsWithStatus
+                                    .filter((s) => s.slot > now)
+                                    .slice(0, 6)
+                                    .map(({ slot }, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="flex items-center gap-2 text-xs text-muted-foreground"
+                                      >
+                                        <Clock className="w-3 h-3" />
+                                        {slot.toLocaleDateString("pt-BR", {
+                                          day: "2-digit",
+                                          month: "short",
+                                        })}{" "}
+                                        {slot.toLocaleTimeString("pt-BR", {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        })}
+                                      </div>
+                                    ))}
+                                  {slotsWithStatus.filter((s) => s.slot > now)
+                                    .length === 0 && (
+                                    <p className="text-xs text-muted-foreground">
+                                      Sem doses futuras
+                                    </p>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1010,6 +944,84 @@ export default function InternacaoPage() {
             </Card>
           )}
         </div>
+      </div>
+
+      {/* Boxes Section */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold">Boxes</p>
+          <Button size="sm" variant="outline" onClick={openNewBox}>
+            <Plus className="w-4 h-4 mr-1" /> Novo Box
+          </Button>
+        </div>
+        {boxes.length === 0 ? (
+          <Card>
+            <CardContent className="py-6 text-center text-sm text-muted-foreground">
+              Nenhum box cadastrado. Crie um box para alocar os animais
+              internados.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {boxes.map((b) => {
+              const occupant = active.find((h) => h.box_id === b.id);
+              return (
+                <Card
+                  key={b.id}
+                  className={`relative ${occupant ? "border-blue-300 bg-blue-50" : "border-green-300 bg-green-50"}`}
+                >
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-semibold text-sm">{b.name}</p>
+                        {b.size && (
+                          <p className="text-xs text-muted-foreground">
+                            Tam: {b.size}
+                          </p>
+                        )}
+                        {b.location && (
+                          <p className="text-xs text-muted-foreground">
+                            {b.location}
+                          </p>
+                        )}
+                        {occupant ? (
+                          <p className="text-xs text-blue-700 font-medium mt-1">
+                            {occupant.pet?.name ?? "Ocupado"}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-green-700 font-medium mt-1">
+                            Livre
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex gap-1 ml-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => openEditBox(b)}
+                        >
+                          <Plus className="w-3 h-3 rotate-45" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-destructive hover:text-destructive"
+                          onClick={() => {
+                            if (confirm("Excluir box?"))
+                              deleteBoxMutation.mutate(b.id);
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* New Hospitalization Dialog */}
@@ -1028,7 +1040,7 @@ export default function InternacaoPage() {
                   setForm((f) => ({
                     ...f,
                     petId: v,
-                    clientId: pet?.clientId ?? "",
+                    clientId: pet?.client?.id ?? "",
                   }));
                 }}
               >
@@ -1036,35 +1048,43 @@ export default function InternacaoPage() {
                   <SelectValue placeholder="Selecionar pet..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {pets
-                    .filter((p) => p.status === "active")
-                    .map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} (
-                        {clients.find((c) => c.id === p.clientId)?.name})
-                      </SelectItem>
-                    ))}
+                  {pets.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                      {p.client ? ` (${p.client.name})` : ""}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Veterinário</Label>
-                <Select
-                  value={form.vetId}
-                  onValueChange={(v) => setForm((f) => ({ ...f, vetId: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecionar..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {vets.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>
-                        {v.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isAutonomous ? (
+                  <Input
+                    value={currentUser?.name ?? ""}
+                    readOnly
+                    className="bg-muted"
+                  />
+                ) : (
+                  <Select
+                    value={form.vetId}
+                    onValueChange={(v: string) =>
+                      setForm((f) => ({ ...f, vetId: v }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(vets as ApiUser[]).map((v) => (
+                        <SelectItem key={v.id} value={v.id}>
+                          {v.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>Box</Label>
@@ -1236,100 +1256,61 @@ export default function InternacaoPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Administration Registration Dialog */}
+      {/* Dose Confirmation Dialog */}
       <Dialog
-        open={!!adminDialog}
+        open={!!confirmingDose}
         onOpenChange={(open) => {
           if (!open) {
-            setAdminDialog(null);
-            setAdminForm({
-              administeredBy: "",
-              administeredAt: "",
-              notes: "",
-              skipped: false,
-            });
+            setConfirmingDose(null);
+            setDoseNotes("");
           }
         }}
       >
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Registrar Administração</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckSquare className="w-5 h-5 text-green-600" />
+              Confirmar Administração
+            </DialogTitle>
           </DialogHeader>
-          {adminDialog && (
+          {confirmingDose && (
             <div className="space-y-4 py-2">
-              <div className="rounded-lg bg-blue-50 border border-blue-100 p-3 space-y-0.5">
+              <div className="rounded-lg bg-blue-50 border border-blue-100 p-3 space-y-1">
                 <p className="text-sm font-semibold">
-                  {adminDialog.presc.medication}
+                  {confirmingDose.presc.medication}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {adminDialog.presc.dosage}
-                  {adminDialog.presc.route
-                    ? ` • ${adminDialog.presc.route}`
+                  {confirmingDose.presc.dosage}
+                  {confirmingDose.presc.route
+                    ? ` • ${confirmingDose.presc.route}`
                     : ""}
+                  {" • "}
+                  {confirmingDose.presc.frequency}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Agendada para:{" "}
-                  <span
-                    className={
-                      adminDialog.admin.status === "late"
-                        ? "text-red-600 font-medium"
-                        : ""
-                    }
-                  >
-                    {formatDateTime(adminDialog.admin.scheduledTime)}
-                  </span>
+                  Dose prevista:{" "}
+                  <strong>
+                    {confirmingDose.slotTime.toLocaleString("pt-BR", {
+                      day: "2-digit",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </strong>
                 </p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Administrado por *</Label>
-                  <Input
-                    value={adminForm.administeredBy}
-                    onChange={(e) =>
-                      setAdminForm((f) => ({
-                        ...f,
-                        administeredBy: e.target.value,
-                      }))
-                    }
-                    placeholder="Nome"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Hora da administração *</Label>
-                  <Input
-                    type="datetime-local"
-                    value={adminForm.administeredAt}
-                    onChange={(e) =>
-                      setAdminForm((f) => ({
-                        ...f,
-                        administeredAt: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  Administrado por:{" "}
+                  <strong>{currentUser?.name ?? "Equipe"}</strong>
+                </p>
               </div>
               <div className="space-y-1.5">
-                <Label>Observações</Label>
+                <Label>Observações (opcional)</Label>
                 <Textarea
-                  value={adminForm.notes}
-                  onChange={(e) =>
-                    setAdminForm((f) => ({ ...f, notes: e.target.value }))
-                  }
+                  value={doseNotes}
+                  onChange={(e) => setDoseNotes(e.target.value)}
                   placeholder="Reação, intercorrência, etc."
                   rows={2}
                 />
-              </div>
-              <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                <Checkbox
-                  id="skip-dose"
-                  checked={adminForm.skipped}
-                  onCheckedChange={(v) =>
-                    setAdminForm((f) => ({ ...f, skipped: !!v }))
-                  }
-                />
-                <label htmlFor="skip-dose" className="text-sm cursor-pointer">
-                  Pulou esta dose (não administrada)
-                </label>
               </div>
             </div>
           )}
@@ -1337,22 +1318,104 @@ export default function InternacaoPage() {
             <Button
               variant="outline"
               onClick={() => {
-                setAdminDialog(null);
-                setAdminForm({
-                  administeredBy: "",
-                  administeredAt: "",
-                  notes: "",
-                  skipped: false,
-                });
+                setConfirmingDose(null);
+                setDoseNotes("");
               }}
             >
               Cancelar
             </Button>
             <Button
-              onClick={handleRegisterAdmin}
-              variant={adminForm.skipped ? "secondary" : "default"}
+              disabled={confirmDoseMutation.isPending}
+              onClick={() => {
+                if (!selected || !confirmingDose) return;
+                confirmDoseMutation.mutate({
+                  hospId: selected.id,
+                  prescId: confirmingDose.presc.id,
+                  administeredAt: new Date().toISOString(),
+                  notes: doseNotes || undefined,
+                });
+              }}
             >
-              {adminForm.skipped ? "Confirmar Pulo" : "Confirmar Administração"}
+              {confirmDoseMutation.isPending ? "Confirmando..." : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Box CRUD Dialog */}
+      <Dialog open={boxDialogOpen} onOpenChange={setBoxDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{editingBox ? "Editar Box" : "Novo Box"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Nome *</Label>
+              <Input
+                value={boxForm.name}
+                onChange={(e) =>
+                  setBoxForm((f) => ({ ...f, name: e.target.value }))
+                }
+                placeholder="Ex: Box 01, UTI A"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Tamanho</Label>
+                <Select
+                  value={boxForm.size}
+                  onValueChange={(v: string) =>
+                    setBoxForm((f) => ({ ...f, size: v }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="P">Pequeno</SelectItem>
+                    <SelectItem value="M">Médio</SelectItem>
+                    <SelectItem value="G">Grande</SelectItem>
+                    <SelectItem value="GG">Extra Grande</SelectItem>
+                    <SelectItem value="UTI">UTI</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Localização</Label>
+                <Input
+                  value={boxForm.location}
+                  onChange={(e) =>
+                    setBoxForm((f) => ({ ...f, location: e.target.value }))
+                  }
+                  placeholder="Ex: Ala A"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Observações</Label>
+              <Textarea
+                value={boxForm.notes}
+                onChange={(e) =>
+                  setBoxForm((f) => ({ ...f, notes: e.target.value }))
+                }
+                rows={2}
+                placeholder="Opcional"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBoxDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveBox}
+              disabled={
+                createBoxMutation.isPending || updateBoxMutation.isPending
+              }
+            >
+              {createBoxMutation.isPending || updateBoxMutation.isPending
+                ? "Salvando..."
+                : "Salvar"}
             </Button>
           </DialogFooter>
         </DialogContent>

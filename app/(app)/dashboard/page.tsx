@@ -1,24 +1,19 @@
 "use client";
-import { useEffect, useState } from "react";
 import {
   Calendar,
-  Users,
   ShoppingCart,
   AlertTriangle,
-  TrendingUp,
   BedDouble,
-  PawPrint,
   Clock,
+  RefreshCw,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency, formatTime } from "@/lib/utils";
-import { appointmentsDb } from "@/mocks/db";
-import { productsDb } from "@/mocks/db";
-import { salesDb } from "@/mocks/db";
-import { hospitalizationsDb } from "@/mocks/db";
-import { clientsDb } from "@/mocks/db";
-import type { Appointment, Product, Sale, Hospitalization } from "@/types";
+import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@/lib/utils";
+import { useDashboardStats } from "@/hooks/use-dashboard";
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   AreaChart,
   Area,
@@ -35,25 +30,20 @@ import {
   Legend,
 } from "recharts";
 
-const salesChartData = [
-  { day: "Seg", vendas: 420, atendimentos: 8 },
-  { day: "Ter", vendas: 680, atendimentos: 12 },
-  { day: "Qua", vendas: 540, atendimentos: 9 },
-  { day: "Qui", vendas: 890, atendimentos: 15 },
-  { day: "Sex", vendas: 1200, atendimentos: 18 },
-  { day: "Sáb", vendas: 760, atendimentos: 11 },
-  { day: "Dom", vendas: 320, atendimentos: 5 },
+const PIE_COLORS = [
+  "#1B2A6B",
+  "#2DC6C6",
+  "#f59e0b",
+  "#4f8ef7",
+  "#ef4444",
+  "#10b981",
+  "#8b5cf6",
 ];
 
-const servicesPieData = [
-  { name: "Consultas", value: 38, color: "#1B2A6B" },
-  { name: "Estética", value: 25, color: "#2DC6C6" },
-  { name: "Vacinas", value: 18, color: "#f59e0b" },
-  { name: "Exames", value: 12, color: "#4f8ef7" },
-  { name: "Cirurgias", value: 7, color: "#ef4444" },
-];
-
-const statusColors: Record<string, string> = {
+const statusColors: Record<
+  string,
+  "info" | "success" | "warning" | "secondary" | "destructive"
+> = {
   scheduled: "info",
   confirmed: "success",
   in_progress: "warning",
@@ -100,33 +90,25 @@ function KpiCard({
 }
 
 export default function DashboardPage() {
-  const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
-  const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
-  const [todaySales, setTodaySales] = useState<Sale[]>([]);
-  const [activeHospitalizations, setActiveHospitalizations] = useState<
-    Hospitalization[]
-  >([]);
-  const [loading, setLoading] = useState(true);
+  const { data: stats, isLoading, refetch } = useDashboardStats();
 
-  useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
-    Promise.all([
-      appointmentsDb.findWhere((a) => a.date.startsWith(today)),
-      productsDb.findWhere((p) => p.stock <= p.minStock && p.active),
-      salesDb.findWhere((s) => s.createdAt.startsWith(today)),
-      hospitalizationsDb.findWhere((h) => h.status === "active"),
-    ]).then(([appts, lowStock, sales, hosps]) => {
-      setTodayAppointments(appts);
-      setLowStockProducts(lowStock);
-      setTodaySales(sales);
-      setActiveHospitalizations(hosps);
-      setLoading(false);
-    });
-  }, []);
+  const weeklySalesChart = (stats?.weekly_sales ?? []).map((d) => ({
+    day: format(parseISO(d.date), "EEE", { locale: ptBR }),
+    vendas: Number(d.total),
+    count: d.count,
+  }));
 
-  const todayRevenue = todaySales.reduce((s, sale) => s + sale.total, 0);
+  const weeklyApptsChart = (stats?.weekly_appointments ?? []).map((d) => ({
+    day: format(parseISO(d.date), "EEE", { locale: ptBR }),
+    atendimentos: d.count,
+  }));
 
-  if (loading) {
+  const servicesBreakdown = (stats?.services_breakdown ?? []).map((s, i) => ({
+    ...s,
+    color: PIE_COLORS[i % PIE_COLORS.length],
+  }));
+
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -136,9 +118,19 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground text-sm">Visão geral do dia</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground text-sm">Visão geral do dia</p>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => refetch()}
+          title="Atualizar"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </Button>
       </div>
 
       {/* KPIs */}
@@ -146,47 +138,50 @@ export default function DashboardPage() {
         <KpiCard
           title="Atendimentos Hoje"
           value={
-            todayAppointments.filter((a) =>
-              ["scheduled", "confirmed", "in_progress"].includes(a.status),
-            ).length
+            (stats?.today_appointments.scheduled ?? 0) +
+            (stats?.today_appointments.confirmed ?? 0) +
+            (stats?.today_appointments.in_progress ?? 0)
           }
-          sub={`${todayAppointments.filter((a) => a.status === "completed").length} concluídos`}
+          sub={`${stats?.today_appointments.completed ?? 0} concluídos`}
           icon={Calendar}
           color="bg-[#1B2A6B]"
         />
         <KpiCard
           title="Vendas do Dia"
-          value={formatCurrency(todayRevenue)}
-          sub={`${todaySales.length} transações`}
+          value={formatCurrency(stats?.today_sales.revenue ?? 0)}
+          sub={`${stats?.today_sales.total ?? 0} transações`}
           icon={ShoppingCart}
           color="bg-green-500"
         />
         <KpiCard
           title="Internações Ativas"
-          value={activeHospitalizations.length}
+          value={stats?.active_hospitalizations.total ?? 0}
           sub="animais internados"
           icon={BedDouble}
           color="bg-[#2DC6C6]"
         />
         <KpiCard
           title="Estoque Baixo"
-          value={lowStockProducts.length}
+          value={stats?.low_stock_products.total ?? 0}
           sub="produtos abaixo do mínimo"
           icon={AlertTriangle}
-          color={lowStockProducts.length > 0 ? "bg-red-500" : "bg-gray-400"}
+          color={
+            (stats?.low_stock_products.total ?? 0) > 0
+              ? "bg-red-500"
+              : "bg-gray-400"
+          }
         />
       </div>
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Sales area chart */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">Vendas da Semana</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={salesChartData}>
+              <AreaChart data={weeklySalesChart}>
                 <defs>
                   <linearGradient id="colorVendas" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#1B2A6B" stopOpacity={0.25} />
@@ -213,36 +208,40 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Services pie */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Serviços por Tipo</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={servicesPieData}
-                  cx="50%"
-                  cy="45%"
-                  outerRadius={70}
-                  dataKey="value"
-                >
-                  {servicesPieData.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
-                <Tooltip formatter={(v) => `${v}%`} />
-              </PieChart>
-            </ResponsiveContainer>
+            {servicesBreakdown.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-16">
+                Sem dados
+              </p>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={servicesBreakdown}
+                    cx="50%"
+                    cy="45%"
+                    outerRadius={70}
+                    dataKey="value"
+                  >
+                    {servicesBreakdown.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
 
       {/* Bottom row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Today's appointments */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -250,13 +249,13 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {todayAppointments.length === 0 ? (
+            {(stats?.today_appointments.list ?? []).length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-6">
                 Nenhum agendamento hoje
               </p>
             ) : (
               <div className="space-y-2">
-                {todayAppointments.slice(0, 6).map((appt) => (
+                {stats?.today_appointments.list.map((appt) => (
                   <div
                     key={appt.id}
                     className="flex items-center justify-between py-2 border-b last:border-0"
@@ -267,24 +266,16 @@ export default function DashboardPage() {
                       </div>
                       <div>
                         <p className="text-sm font-medium">
-                          {appt.serviceType}
+                          {appt.service_type}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {appt.startTime} – {appt.endTime}
+                          {appt.start_time} – {appt.end_time}
+                          {appt.pet && ` · ${appt.pet.name}`}
                         </p>
                       </div>
                     </div>
-                    <Badge
-                      variant={
-                        statusColors[appt.status] as
-                          | "info"
-                          | "success"
-                          | "warning"
-                          | "secondary"
-                          | "destructive"
-                      }
-                    >
-                      {statusLabels[appt.status]}
+                    <Badge variant={statusColors[appt.status] ?? "secondary"}>
+                      {statusLabels[appt.status] ?? appt.status}
                     </Badge>
                   </div>
                 ))}
@@ -293,7 +284,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Low stock alert */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -302,13 +292,13 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {lowStockProducts.length === 0 ? (
+            {(stats?.low_stock_products.list ?? []).length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-6">
                 Nenhum alerta de estoque
               </p>
             ) : (
               <div className="space-y-2">
-                {lowStockProducts.slice(0, 6).map((p) => (
+                {stats?.low_stock_products.list.map((p) => (
                   <div
                     key={p.id}
                     className="flex items-center justify-between py-2 border-b last:border-0"
@@ -316,7 +306,7 @@ export default function DashboardPage() {
                     <div>
                       <p className="text-sm font-medium">{p.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        Mínimo: {p.minStock} {p.unit}
+                        Mínimo: {p.min_stock} {p.unit}
                       </p>
                     </div>
                     <Badge variant={p.stock === 0 ? "destructive" : "warning"}>
@@ -337,7 +327,7 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={salesChartData}>
+            <BarChart data={weeklyApptsChart}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="day" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} />

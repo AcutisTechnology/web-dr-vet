@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ChevronLeft,
@@ -33,28 +33,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  petsDb,
-  clientsDb,
-  medicalEventsDb,
-  usersDb,
-  financeEntriesDb,
-} from "@/mocks/db";
-import type {
-  Pet,
-  Client,
-  MedicalEvent,
-  User,
-  PetAnamnesis,
-  FinanceEntry,
-} from "@/types";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { petService } from "@/services/pet.service";
+import { clientService } from "@/services/client.service";
+import { medicalEventService } from "@/services/medical-event.service";
+import { adaptApiPetToPet } from "@/adapters/pet.adapter";
+import { adaptApiClientToClient } from "@/adapters/client.adapter";
+import type { ApiMedicalEvent } from "@/types/api";
+import type { Pet, Client, PetAnamnesis, FinanceEntry } from "@/types";
 import { useSessionStore } from "@/stores/session";
-import {
-  formatDate,
-  formatDateTime,
-  formatCurrency,
-  exportToCSV,
-} from "@/lib/utils";
+import { formatDate, formatCurrency, exportToCSV } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 
@@ -281,11 +269,30 @@ export default function PetDetailPage() {
   const { toast } = useToast();
   const { user: currentUser } = useSessionStore();
   const isAutonomous = currentUser?.accountType === "autonomous";
-  const [pet, setPet] = useState<Pet | null>(null);
-  const [client, setClient] = useState<Client | null>(null);
-  const [events, setEvents] = useState<MedicalEvent[]>([]);
-  const [vets, setVets] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const qc = useQueryClient();
+  const { data: pet, isLoading: loadingPet } = useQuery({
+    queryKey: ["pets", petId],
+    queryFn: () => petService.get(petId),
+    select: adaptApiPetToPet,
+    enabled: !!petId,
+  });
+  const { data: client, isLoading: loadingClient } = useQuery({
+    queryKey: ["clients", clientId],
+    queryFn: () => clientService.get(clientId),
+    select: adaptApiClientToClient,
+    enabled: !!clientId,
+  });
+  const { data: apiEvents = [] } = useQuery({
+    queryKey: ["medical-events", petId],
+    queryFn: () => medicalEventService.byPet(petId),
+    select: (data: ApiMedicalEvent[]) =>
+      [...data].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      ),
+    enabled: !!petId,
+  });
+  const events = apiEvents as ApiMedicalEvent[];
+  const loading = loadingPet || loadingClient;
   const [petFinanceEntries, setPetFinanceEntries] = useState<FinanceEntry[]>(
     [],
   );
@@ -341,48 +348,23 @@ export default function PetDetailPage() {
     rxNotes: "",
   });
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [p, cl, usrs] = await Promise.all([
-      petsDb.findById(petId),
-      clientsDb.findById(clientId),
-      usersDb.findWhere((u) => u.role === "vet" || u.role === "admin"),
-    ]);
-    if (!p) {
-      router.push(`/clientes/${clientId}`);
-      return;
-    }
-    setPet(p);
-    setClient(cl ?? null);
-    setVets(usrs);
+  useEffect(() => {
+    if (!pet) return;
     setForm({
-      name: p.name,
-      species: p.species,
-      breed: p.breed,
-      sex: p.sex,
-      birthDate: p.birthDate ?? "",
-      color: p.color ?? "",
-      neutered: p.neutered,
-      weight: p.weight ? String(p.weight) : "",
-      microchip: p.microchip ?? "",
-      notes: p.notes ?? "",
+      name: pet.name,
+      species: pet.species,
+      breed: pet.breed,
+      sex: pet.sex,
+      birthDate: pet.birthDate ?? "",
+      color: pet.color ?? "",
+      neutered: pet.neutered,
+      weight: pet.weight ? String(pet.weight) : "",
+      microchip: pet.microchip ?? "",
+      notes: pet.notes ?? "",
     });
-    setAn({ ...EMPTY_AN, ...(p.anamnesis ?? {}) });
-    const evts = await medicalEventsDb.findWhere((e) => e.petId === p.id);
-    setEvents(
-      evts.sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-      ),
-    );
-    const fins = await financeEntriesDb.findWhere((e) => e.petId === p.id);
-    setPetFinanceEntries(
-      fins.sort(
-        (a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime(),
-      ),
-    );
-    setLoading(false);
+    setAn({ ...EMPTY_AN, ...(pet.anamnesis ?? {}) });
     setDirty(false);
-  }, [petId, clientId, router]);
+  }, [pet]);
 
   const PET_FINANCE_INCOME_TYPES = [
     "consultation",
@@ -419,13 +401,8 @@ export default function PetDetailPage() {
       .filter((e) => e.fromSale)
       .reduce((s, e) => s + e.amount, 0),
   };
-  const refreshFinance = async (petId: string) => {
-    const updated = await financeEntriesDb.findWhere((e) => e.petId === petId);
-    setPetFinanceEntries(
-      updated.sort(
-        (a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime(),
-      ),
-    );
+  const refreshFinance = (_petId: string) => {
+    // Finance API integration pending — local state only for now
   };
   const handleSavePetFinance = async () => {
     if (!pet) return;
@@ -442,35 +419,50 @@ export default function PetDetailPage() {
         return;
       }
       const desc = financeForm.description || `Exame – ${pet.name}`;
+      const now = new Date().toISOString();
       if (financeForm.examCharge && charge > 0) {
-        await financeEntriesDb.create({
-          type: "income",
-          description: `${desc} (cobrado do cliente)`,
-          amount: charge,
-          dueDate,
-          status: "paid",
-          paidDate: dueDate,
-          categoryId: "fc1",
-          paymentMethod: financeForm.paymentMethod,
-          petId: pet.id,
-          petFinanceType: "exam_charge",
-          recurring: false,
-        });
+        setPetFinanceEntries((prev) => [
+          {
+            id: crypto.randomUUID(),
+            type: "income",
+            description: `${desc} (cobrado do cliente)`,
+            amount: charge,
+            dueDate,
+            status: "paid",
+            paidDate: dueDate,
+            categoryId: "fc1",
+            paymentMethod: financeForm.paymentMethod,
+            petId: pet.id,
+            petFinanceType: "exam_charge",
+            fromSale: false,
+            recurring: false,
+            createdAt: now,
+            updatedAt: now,
+          } as FinanceEntry,
+          ...prev,
+        ]);
       }
       if (financeForm.examLab && lab > 0) {
-        await financeEntriesDb.create({
-          type: "expense",
-          description: `${desc} (laboratório)`,
-          amount: lab,
-          dueDate,
-          status: "paid",
-          paidDate: dueDate,
-          categoryId: "fc7",
-          paymentMethod: financeForm.paymentMethod,
-          petId: pet.id,
-          petFinanceType: "exam_lab",
-          recurring: false,
-        });
+        setPetFinanceEntries((prev) => [
+          {
+            id: crypto.randomUUID(),
+            type: "expense",
+            description: `${desc} (laboratório)`,
+            amount: lab,
+            dueDate,
+            status: "paid",
+            paidDate: dueDate,
+            categoryId: "fc7",
+            paymentMethod: financeForm.paymentMethod,
+            petId: pet.id,
+            petFinanceType: "exam_lab",
+            fromSale: false,
+            recurring: false,
+            createdAt: now,
+            updatedAt: now,
+          } as FinanceEntry,
+          ...prev,
+        ]);
       }
     } else if (financeForm.petFinanceType === "medication") {
       const charge = parseFloat(financeForm.medCharge);
@@ -483,35 +475,50 @@ export default function PetDetailPage() {
         return;
       }
       const desc = financeForm.description || `Medicação – ${pet.name}`;
+      const now2 = new Date().toISOString();
       if (financeForm.medCharge && charge > 0) {
-        await financeEntriesDb.create({
-          type: "income",
-          description: `${desc} (cobrado do cliente)`,
-          amount: charge,
-          dueDate,
-          status: "paid",
-          paidDate: dueDate,
-          categoryId: "fc1",
-          paymentMethod: financeForm.paymentMethod,
-          petId: pet.id,
-          petFinanceType: "medication_charge",
-          recurring: false,
-        });
+        setPetFinanceEntries((prev) => [
+          {
+            id: crypto.randomUUID(),
+            type: "income",
+            description: `${desc} (cobrado do cliente)`,
+            amount: charge,
+            dueDate,
+            status: "paid",
+            paidDate: dueDate,
+            categoryId: "fc1",
+            paymentMethod: financeForm.paymentMethod,
+            petId: pet.id,
+            petFinanceType: "medication_charge",
+            fromSale: false,
+            recurring: false,
+            createdAt: now2,
+            updatedAt: now2,
+          } as FinanceEntry,
+          ...prev,
+        ]);
       }
       if (financeForm.medCost && cost > 0) {
-        await financeEntriesDb.create({
-          type: "expense",
-          description: `${desc} (custo)`,
-          amount: cost,
-          dueDate,
-          status: "paid",
-          paidDate: dueDate,
-          categoryId: "fc7",
-          paymentMethod: financeForm.paymentMethod,
-          petId: pet.id,
-          petFinanceType: "medication_cost",
-          recurring: false,
-        });
+        setPetFinanceEntries((prev) => [
+          {
+            id: crypto.randomUUID(),
+            type: "expense",
+            description: `${desc} (custo)`,
+            amount: cost,
+            dueDate,
+            status: "paid",
+            paidDate: dueDate,
+            categoryId: "fc7",
+            paymentMethod: financeForm.paymentMethod,
+            petId: pet.id,
+            petFinanceType: "medication_cost",
+            fromSale: false,
+            recurring: false,
+            createdAt: now2,
+            updatedAt: now2,
+          } as FinanceEntry,
+          ...prev,
+        ]);
       }
     } else {
       if (!financeForm.description || !financeForm.amount) {
@@ -524,22 +531,30 @@ export default function PetDetailPage() {
       const isIncome = PET_FINANCE_INCOME_TYPES.includes(
         financeForm.petFinanceType,
       );
-      await financeEntriesDb.create({
-        type: isIncome ? "income" : "expense",
-        description: financeForm.description,
-        amount: parseFloat(financeForm.amount),
-        dueDate,
-        status: "paid",
-        paidDate: dueDate,
-        categoryId: isIncome ? "fc1" : "fc7",
-        paymentMethod: financeForm.paymentMethod,
-        petId: pet.id,
-        petFinanceType: financeForm.petFinanceType as
-          | "consultation"
-          | "material"
-          | "fuel",
-        recurring: false,
-      });
+      const now3 = new Date().toISOString();
+      setPetFinanceEntries((prev) => [
+        {
+          id: crypto.randomUUID(),
+          type: isIncome ? "income" : "expense",
+          description: financeForm.description,
+          amount: parseFloat(financeForm.amount),
+          dueDate,
+          status: "paid",
+          paidDate: dueDate,
+          categoryId: isIncome ? "fc1" : "fc7",
+          paymentMethod: financeForm.paymentMethod,
+          petId: pet.id,
+          petFinanceType: financeForm.petFinanceType as
+            | "consultation"
+            | "material"
+            | "fuel",
+          fromSale: false,
+          recurring: false,
+          createdAt: now3,
+          updatedAt: now3,
+        } as FinanceEntry,
+        ...prev,
+      ]);
     }
 
     toast({ title: "Registro financeiro salvo" });
@@ -547,9 +562,6 @@ export default function PetDetailPage() {
     refreshFinance(pet.id);
   };
 
-  useEffect(() => {
-    load();
-  }, [load]);
   const sf = (field: keyof typeof form, value: string | boolean) => {
     setForm((f) => ({ ...f, [field]: value }));
     setDirty(true);
@@ -562,58 +574,89 @@ export default function PetDetailPage() {
     setDirty(true);
   };
 
-  const handleSave = async () => {
+  const updatePetMutation = useMutation({
+    mutationFn: (payload: Parameters<typeof petService.update>[1]) =>
+      petService.update(petId, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["pets", petId] });
+      toast({ title: "Identificação salva com sucesso!" });
+      setSaving(false);
+      setDirty(false);
+      setEditMode(false);
+    },
+    onError: () => {
+      toast({ title: "Erro ao salvar identificação", variant: "destructive" });
+      setSaving(false);
+    },
+  });
+
+  const updateAnamnesisM = useMutation({
+    mutationFn: (anamnesis: Record<string, unknown>) =>
+      petService.updateAnamnesis(petId, anamnesis),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["pets", petId] });
+      toast({ title: "Anamnese salva com sucesso!" });
+      setSaving(false);
+      setDirty(false);
+    },
+    onError: () => {
+      toast({ title: "Erro ao salvar anamnese", variant: "destructive" });
+      setSaving(false);
+    },
+  });
+
+  const handleSaveIdentification = () => {
     if (!pet || !form.name.trim()) {
       toast({ title: "Nome é obrigatório", variant: "destructive" });
       return;
     }
     setSaving(true);
-    await petsDb.update(pet.id, {
+    updatePetMutation.mutate({
       name: form.name.trim(),
       species: form.species,
       breed: form.breed,
       sex: form.sex,
-      birthDate: form.birthDate || undefined,
+      birth_date: form.birthDate || undefined,
       color: form.color || undefined,
       neutered: form.neutered,
       weight: form.weight ? parseFloat(form.weight) : undefined,
       microchip: form.microchip || undefined,
       notes: form.notes || undefined,
-      anamnesis: {
-        ...an,
-        dewormingLastDate: an.dewormingLastDate || undefined,
-        feedingsPerDay: an.feedingsPerDay || undefined,
-      },
     });
-    toast({ title: "Pet atualizado com sucesso!" });
-    setSaving(false);
-    setDirty(false);
-    setEditMode(false);
-    load();
   };
-  const handleMarkDeceased = async () => {
+
+  const handleSaveAnamnesis = () => {
+    if (!pet) return;
+    setSaving(true);
+    const cleaned = Object.fromEntries(
+      Object.entries(an).filter(
+        ([, v]) => v !== undefined && v !== null && v !== "",
+      ),
+    );
+    updateAnamnesisM.mutate(cleaned);
+  };
+  const handleMarkDeceased = () => {
     if (!pet || !confirm(`Marcar ${pet.name} como falecido?`)) return;
-    await petsDb.update(pet.id, { status: "deceased" });
+    updatePetMutation.mutate({ status: "deceased" });
     toast({ title: `${pet.name} marcado como falecido` });
-    load();
   };
   const handleExportCSV = () => {
     exportToCSV(
       events.map((e) => ({
         Data: formatDate(e.date),
-        Tipo: EVT_LBL[e.type],
-        Título: e.title,
+        Tipo: EVT_LBL[e.type] ?? e.type,
         Descrição: e.description ?? "",
-        Peso: e.weightKg ?? "",
+        Diagnóstico: e.diagnosis ?? "",
+        Tratamento: e.treatment ?? "",
       })),
       `prontuario-${pet?.name ?? "pet"}`,
     );
   };
-  const handlePrintPrescription = (event: MedicalEvent) => {
+  const handlePrintPrescription = (event: ApiMedicalEvent) => {
     const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(
-      `<html><head><title>Receita</title><style>body{font-family:Arial;padding:30px;max-width:600px}.item{margin:10px 0;padding:10px;border:1px solid #ddd;border-radius:4px}</style></head><body><h2>VetDom – Receituário</h2><p><b>Pet:</b>${pet?.name}|<b>Tutor:</b>${client?.name}|<b>Data:</b>${formatDate(event.date)}</p><hr/>${event.prescriptionItems?.map((item, i) => `<div class="item"><b>${i + 1}. ${item.medication}</b><br/>Dose:${item.dosage}|Freq:${item.frequency}|Dur:${item.duration}${item.notes ? `<br/>Obs:${item.notes}` : ""}</div>`).join("") ?? ""}<hr/><p style="font-size:12px;color:#666">Impresso em ${new Date().toLocaleString("pt-BR")}</p></body></html>`,
+      `<html><head><title>Receita</title><style>body{font-family:Arial;padding:30px;max-width:600px}.blk{margin:10px 0;padding:10px;border:1px solid #ddd;border-radius:4px}</style></head><body><h2>VetDom – Receituário</h2><p><b>Pet:</b> ${pet?.name} | <b>Tutor:</b> ${client?.name} | <b>Data:</b> ${formatDate(event.date)}</p><hr/>${event.medications ? '<div class="blk"><b>Medicações:</b><br/>' + event.medications + "</div>" : ""}${event.diagnosis ? '<div class="blk"><b>Diagnóstico:</b><br/>' + event.diagnosis + "</div>" : ""}${event.treatment ? '<div class="blk"><b>Tratamento:</b><br/>' + event.treatment + "</div>" : ""}<hr/><p style="font-size:12px;color:#666">Impresso em ${new Date().toLocaleString("pt-BR")}</p></body></html>`,
     );
     win.print();
   };
@@ -1090,22 +1133,41 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
               Editar
             </Button>
           ) : (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setEditMode(false);
-                  load();
-                }}
-              >
-                Cancelar
-              </Button>
-              <Button size="sm" onClick={handleSave} disabled={saving}>
-                <Save className="w-4 h-4 mr-1" />
-                {saving ? "Salvando..." : "Salvar"}
-              </Button>
-            </>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setEditMode(false);
+                if (pet) {
+                  setForm({
+                    name: pet.name,
+                    species: pet.species,
+                    breed: pet.breed,
+                    sex: pet.sex,
+                    birthDate: pet.birthDate ?? "",
+                    color: pet.color ?? "",
+                    neutered: pet.neutered,
+                    weight: pet.weight ? String(pet.weight) : "",
+                    microchip: pet.microchip ?? "",
+                    notes: pet.notes ?? "",
+                  });
+                  setAn({ ...EMPTY_AN, ...(pet.anamnesis ?? {}) });
+                  setDirty(false);
+                }
+              }}
+            >
+              Cancelar
+            </Button>
+          )}
+          {editMode && (
+            <Button
+              size="sm"
+              onClick={handleSaveIdentification}
+              disabled={saving}
+            >
+              <Save className="w-4 h-4 mr-1" />
+              {saving ? "Salvando..." : "Salvar"}
+            </Button>
           )}
           {pet.status === "active" && (
             <Button
@@ -1342,28 +1404,24 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                       opts={SIM_NAO}
                       value={an.vomiting}
                       onChange={(v) => sa("vomiting", v)}
-                      readOnly={!editMode}
                     />
                     <SRow
                       label="Diarreia"
                       opts={SIM_NAO}
                       value={an.diarrhea}
                       onChange={(v) => sa("diarrhea", v)}
-                      readOnly={!editMode}
                     />
                     <SRow
                       label="Apetite (está comendo?)"
                       opts={INGESTAO}
                       value={an.eating}
                       onChange={(v) => sa("eating", v)}
-                      readOnly={!editMode}
                     />
                     <SRow
                       label="Ingestão de água"
                       opts={INGESTAO}
                       value={an.drinking}
                       onChange={(v) => sa("drinking", v)}
-                      readOnly={!editMode}
                     />
                     <SRow
                       label="Urina (frequência/aspecto)"
@@ -1377,28 +1435,24 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                       ]}
                       value={an.urination}
                       onChange={(v) => sa("urination", v)}
-                      readOnly={!editMode}
                     />
                     <SRow
                       label="Fezes (está defecando?)"
                       opts={INGESTAO}
                       value={an.defecation}
                       onChange={(v) => sa("defecation", v)}
-                      readOnly={!editMode}
                     />
                     <SRow
                       label="Perda de peso"
                       opts={INTENS}
                       value={an.weightLoss}
                       onChange={(v) => sa("weightLoss", v)}
-                      readOnly={!editMode}
                     />
                     <SRow
                       label="Cansaço / Letargia"
                       opts={INTENS}
                       value={an.fatigue}
                       onChange={(v) => sa("fatigue", v)}
-                      readOnly={!editMode}
                     />
                   </div>
                   <div>
@@ -1410,42 +1464,36 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                       opts={FREQ}
                       value={an.coughing}
                       onChange={(v) => sa("coughing", v)}
-                      readOnly={!editMode}
                     />
                     <SRow
                       label="Espirro"
                       opts={FREQ}
                       value={an.sneezing}
                       onChange={(v) => sa("sneezing", v)}
-                      readOnly={!editMode}
                     />
                     <SRow
                       label="Dificuldade respiratória"
                       opts={INTENS}
                       value={an.dyspnea}
                       onChange={(v) => sa("dyspnea", v)}
-                      readOnly={!editMode}
                     />
                     <SRow
                       label="Secreção nasal"
                       opts={SECRECAO}
                       value={an.nasalDischarge}
                       onChange={(v) => sa("nasalDischarge", v)}
-                      readOnly={!editMode}
                     />
                     <SRow
                       label="Secreção ocular"
                       opts={SECRECAO}
                       value={an.ocularDischarge}
                       onChange={(v) => sa("ocularDischarge", v)}
-                      readOnly={!editMode}
                     />
                     <SRow
                       label="Coceira / Prurido"
                       opts={INTENS}
                       value={an.pruritus}
                       onChange={(v) => sa("pruritus", v)}
-                      readOnly={!editMode}
                     />
                     <SRow
                       label="Lesões de pele"
@@ -1459,14 +1507,12 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                       ]}
                       value={an.skinLesions}
                       onChange={(v) => sa("skinLesions", v)}
-                      readOnly={!editMode}
                     />
                     <SRow
                       label="Claudicação / Manqueira"
                       opts={INTENS}
                       value={an.lameness}
                       onChange={(v) => sa("lameness", v)}
-                      readOnly={!editMode}
                     />
                     <SRow
                       label="Convulsão / Crise epiléptica"
@@ -1477,42 +1523,18 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                       ]}
                       value={an.seizures}
                       onChange={(v) => sa("seizures", v)}
-                      readOnly={!editMode}
                     />
                   </div>
                 </div>
-                {(editMode || an.complaintsNotes) && (
-                  <div className="mt-4 space-y-1.5">
-                    <p className="text-xs text-muted-foreground">
-                      Observações complementares
-                    </p>
-                    {editMode ? (
-                      <Textarea
-                        value={an.complaintsNotes ?? ""}
-                        onChange={(e) => sa("complaintsNotes", e.target.value)}
-                        rows={3}
-                        placeholder="Início dos sintomas, evolução, situações que pioram ou melhoram..."
-                      />
-                    ) : (
-                      <p className="text-sm bg-muted rounded px-3 py-2 whitespace-pre-wrap">
-                        {an.complaintsNotes}
-                      </p>
-                    )}
-                  </div>
-                )}
-                {!editMode &&
-                  !an.vomiting &&
-                  !an.diarrhea &&
-                  !an.eating &&
-                  !an.drinking &&
-                  !an.coughing &&
-                  !an.fatigue &&
-                  !an.complaintsNotes && (
-                    <p className="text-sm text-muted-foreground py-4 text-center">
-                      Nenhuma queixa registrada. Clique em{" "}
-                      <strong>Editar</strong> para preencher.
-                    </p>
-                  )}
+                <div className="mt-4 space-y-1.5">
+                  <Label>Observações complementares</Label>
+                  <Textarea
+                    value={an.complaintsNotes ?? ""}
+                    onChange={(e) => sa("complaintsNotes", e.target.value)}
+                    rows={3}
+                    placeholder="Início dos sintomas, evolução, situações que pioram ou melhoram..."
+                  />
+                </div>
               </CardContent>
             </Card>
 
@@ -1530,28 +1552,24 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                     opts={MENTAL}
                     value={an.mentalStatus}
                     onChange={(v) => sa("mentalStatus", v)}
-                    readOnly={!editMode}
                   />
                   <SRow
                     label="Ataxia / Incoordenação"
                     opts={INTENS}
                     value={an.ataxia}
                     onChange={(v) => sa("ataxia", v)}
-                    readOnly={!editMode}
                   />
                   <SRow
                     label="Tremores"
                     opts={FREQ}
                     value={an.tremors}
                     onChange={(v) => sa("tremors", v)}
-                    readOnly={!editMode}
                   />
                   <SRow
                     label="Sinais vestibulares"
                     opts={SIM_NAO_SIMPLES}
                     value={an.vestibularSigns}
                     onChange={(v) => sa("vestibularSigns", v)}
-                    readOnly={!editMode}
                   />
                   <SRow
                     label="Convulsão"
@@ -1562,18 +1580,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                     ]}
                     value={an.seizures}
                     onChange={(v) => sa("seizures", v)}
-                    readOnly={!editMode}
                   />
-                  {!editMode &&
-                    !an.mentalStatus &&
-                    !an.ataxia &&
-                    !an.tremors &&
-                    !an.vestibularSigns &&
-                    !an.seizures && (
-                      <p className="text-xs text-muted-foreground py-3 text-center">
-                        Não avaliado
-                      </p>
-                    )}
                 </CardContent>
               </Card>
               <Card className="md:col-span-1">
@@ -1588,38 +1595,25 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                     opts={SECRECAO}
                     value={an.eyeDischarge}
                     onChange={(v) => sa("eyeDischarge", v)}
-                    readOnly={!editMode}
                   />
                   <SRow
                     label="Vermelhidão / Hiperemia"
                     opts={INTENS}
                     value={an.eyeRedness}
                     onChange={(v) => sa("eyeRedness", v)}
-                    readOnly={!editMode}
                   />
                   <SRow
                     label="Opacidade / Catarata"
                     opts={OLHO_OPACIDADE}
                     value={an.eyeOpacity}
                     onChange={(v) => sa("eyeOpacity", v)}
-                    readOnly={!editMode}
                   />
                   <SRow
                     label="Dor ocular / Blefaroespasmo"
                     opts={SIM_NAO_SIMPLES}
                     value={an.eyePain}
                     onChange={(v) => sa("eyePain", v)}
-                    readOnly={!editMode}
                   />
-                  {!editMode &&
-                    !an.eyeDischarge &&
-                    !an.eyeRedness &&
-                    !an.eyeOpacity &&
-                    !an.eyePain && (
-                      <p className="text-xs text-muted-foreground py-3 text-center">
-                        Não avaliado
-                      </p>
-                    )}
                 </CardContent>
               </Card>
               <Card className="md:col-span-1">
@@ -1634,14 +1628,12 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                     opts={OUVIDO_AFETADO}
                     value={an.earAffected}
                     onChange={(v) => sa("earAffected", v)}
-                    readOnly={!editMode}
                   />
                   <SRow
                     label="Secreção auricular"
                     opts={OUVIDO_SECRECAO}
                     value={an.earDischarge}
                     onChange={(v) => sa("earDischarge", v)}
-                    readOnly={!editMode}
                   />
                   <SRow
                     label="Odor auricular"
@@ -1652,26 +1644,21 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                     ]}
                     value={an.earOdor}
                     onChange={(v) => sa("earOdor", v)}
-                    readOnly={!editMode}
                   />
                   <SRow
                     label="Coçar / Chacoalhar cabeça"
                     opts={FREQ}
                     value={an.earScratch}
                     onChange={(v) => sa("earScratch", v)}
-                    readOnly={!editMode}
                   />
-                  {!editMode &&
-                    !an.earAffected &&
-                    !an.earDischarge &&
-                    !an.earOdor &&
-                    !an.earScratch && (
-                      <p className="text-xs text-muted-foreground py-3 text-center">
-                        Não avaliado
-                      </p>
-                    )}
                 </CardContent>
               </Card>
+            </div>
+            <div className="flex justify-end mt-4">
+              <Button onClick={handleSaveAnamnesis} disabled={saving}>
+                <Save className="w-4 h-4 mr-1" />
+                {saving ? "Salvando..." : "Salvar"}
+              </Button>
             </div>
           </TabsContent>
 
@@ -1683,117 +1670,97 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                   <CardTitle className="text-base">Ambiente e Rotina</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {editMode ? (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <Label>Ambiente</Label>
-                        <Select
-                          value={an.environment || "__none__"}
-                          onValueChange={(v) =>
-                            sa("environment", v === "__none__" ? "" : v)
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>Ambiente</Label>
+                      <Select
+                        value={an.environment || "__none__"}
+                        onValueChange={(v) =>
+                          sa("environment", v === "__none__" ? "" : v)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecionar..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">
+                            Não informado
+                          </SelectItem>
+                          <SelectItem value="domiciliar">
+                            Domiciliar (interior)
+                          </SelectItem>
+                          <SelectItem value="quintal">
+                            Quintal / Área externa
+                          </SelectItem>
+                          <SelectItem value="misto">Misto</SelectItem>
+                          <SelectItem value="rural">Rural / Fazenda</SelectItem>
+                          <SelectItem value="canil">Canil / Gatil</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Tipo de moradia</Label>
+                      <Select
+                        value={an.housingType || "__none__"}
+                        onValueChange={(v) =>
+                          sa("housingType", v === "__none__" ? "" : v)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecionar..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">
+                            Não informado
+                          </SelectItem>
+                          <SelectItem value="apartamento">
+                            Apartamento
+                          </SelectItem>
+                          <SelectItem value="casa_quintal">
+                            Casa com quintal
+                          </SelectItem>
+                          <SelectItem value="casa_sem_quintal">
+                            Casa sem quintal
+                          </SelectItem>
+                          <SelectItem value="sitio">Sítio / Chácara</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Frequência de passeios</Label>
+                      <Input
+                        value={an.walkFrequency ?? ""}
+                        onChange={(e) => sa("walkFrequency", e.target.value)}
+                        placeholder="Ex: 2x ao dia..."
+                      />
+                    </div>
+                    <div className="col-span-2 space-y-2">
+                      <div className="flex items-center gap-3">
+                        <Switch
+                          checked={!!an.contactWithOtherAnimals}
+                          onCheckedChange={(v) =>
+                            sa("contactWithOtherAnimals", v)
                           }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecionar..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">
-                              Não informado
-                            </SelectItem>
-                            <SelectItem value="domiciliar">
-                              Domiciliar (interior)
-                            </SelectItem>
-                            <SelectItem value="quintal">
-                              Quintal / Área externa
-                            </SelectItem>
-                            <SelectItem value="misto">Misto</SelectItem>
-                            <SelectItem value="rural">
-                              Rural / Fazenda
-                            </SelectItem>
-                            <SelectItem value="canil">Canil / Gatil</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Tipo de moradia</Label>
-                        <Select
-                          value={an.housingType || "__none__"}
-                          onValueChange={(v) =>
-                            sa("housingType", v === "__none__" ? "" : v)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecionar..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">
-                              Não informado
-                            </SelectItem>
-                            <SelectItem value="apartamento">
-                              Apartamento
-                            </SelectItem>
-                            <SelectItem value="casa_quintal">
-                              Casa com quintal
-                            </SelectItem>
-                            <SelectItem value="casa_sem_quintal">
-                              Casa sem quintal
-                            </SelectItem>
-                            <SelectItem value="sitio">
-                              Sítio / Chácara
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Frequência de passeios</Label>
-                        <Input
-                          value={an.walkFrequency ?? ""}
-                          onChange={(e) => sa("walkFrequency", e.target.value)}
-                          placeholder="Ex: 2x ao dia..."
+                          id="oa"
                         />
+                        <Label htmlFor="oa">
+                          Contato com outros animais domésticos
+                        </Label>
                       </div>
-                      <div className="col-span-2 space-y-2">
-                        <div className="flex items-center gap-3">
-                          <Switch
-                            checked={!!an.contactWithOtherAnimals}
-                            onCheckedChange={(v) =>
-                              sa("contactWithOtherAnimals", v)
-                            }
-                            id="oa"
-                          />
-                          <Label htmlFor="oa">
-                            Contato com outros animais domésticos
-                          </Label>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Switch
-                            checked={!!an.contactWithWildAnimals}
-                            onCheckedChange={(v) =>
-                              sa("contactWithWildAnimals", v)
-                            }
-                            id="wa"
-                          />
-                          <Label htmlFor="wa">
-                            Contato com animais silvestres
-                          </Label>
-                        </div>
+                      <div className="flex items-center gap-3">
+                        <Switch
+                          checked={!!an.contactWithWildAnimals}
+                          onCheckedChange={(v) =>
+                            sa("contactWithWildAnimals", v)
+                          }
+                          id="wa"
+                        />
+                        <Label htmlFor="wa">
+                          Contato com animais silvestres
+                        </Label>
                       </div>
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                      <IR l="Ambiente" v={an.environment} />
-                      <IR l="Moradia" v={an.housingType} />
-                      <IR l="Passeios" v={an.walkFrequency} />
-                      <BB
-                        l="Contato com outros animais"
-                        v={!!an.contactWithOtherAnimals}
-                      />
-                      <BB
-                        l="Contato com silvestres"
-                        v={!!an.contactWithWildAnimals}
-                      />
-                    </div>
-                  )}
+                  </div>
                 </CardContent>
               </Card>
               <Card>
@@ -1801,98 +1768,93 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                   <CardTitle className="text-base">Alimentação</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {editMode ? (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <Label>Tipo de alimentação</Label>
-                        <Select
-                          value={an.foodType || "__none__"}
-                          onValueChange={(v) =>
-                            sa("foodType", v === "__none__" ? "" : v)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecionar..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">
-                              Não informado
-                            </SelectItem>
-                            <SelectItem value="racao_seca">
-                              Ração seca
-                            </SelectItem>
-                            <SelectItem value="racao_umida">
-                              Ração úmida
-                            </SelectItem>
-                            <SelectItem value="natural">
-                              Alimentação natural (BARF)
-                            </SelectItem>
-                            <SelectItem value="misto">Misto</SelectItem>
-                            <SelectItem value="caseira">
-                              Comida caseira
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Marca / Produto</Label>
-                        <Input
-                          value={an.foodBrand ?? ""}
-                          onChange={(e) => sa("foodBrand", e.target.value)}
-                          placeholder="Ex: Royal Canin..."
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Refeições por dia</Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={an.feedingsPerDay ?? ""}
-                          onChange={(e) =>
-                            sa(
-                              "feedingsPerDay",
-                              e.target.value
-                                ? parseInt(e.target.value)
-                                : undefined,
-                            )
-                          }
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Fonte de água</Label>
-                        <Select
-                          value={an.waterSource || "__none__"}
-                          onValueChange={(v) =>
-                            sa("waterSource", v === "__none__" ? "" : v)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecionar..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">
-                              Não informado
-                            </SelectItem>
-                            <SelectItem value="filtrada">Filtrada</SelectItem>
-                            <SelectItem value="torneira">Torneira</SelectItem>
-                            <SelectItem value="mineral">Mineral</SelectItem>
-                            <SelectItem value="fonte">
-                              Bebedouro automático
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>Tipo de alimentação</Label>
+                      <Select
+                        value={an.foodType || "__none__"}
+                        onValueChange={(v) =>
+                          sa("foodType", v === "__none__" ? "" : v)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecionar..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">
+                            Não informado
+                          </SelectItem>
+                          <SelectItem value="racao_seca">Ração seca</SelectItem>
+                          <SelectItem value="racao_umida">
+                            Ração úmida
+                          </SelectItem>
+                          <SelectItem value="natural">
+                            Alimentação natural (BARF)
+                          </SelectItem>
+                          <SelectItem value="misto">Misto</SelectItem>
+                          <SelectItem value="caseira">
+                            Comida caseira
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                      <IR l="Tipo" v={an.foodType} />
-                      <IR l="Marca" v={an.foodBrand} />
-                      <IR l="Refeições/dia" v={an.feedingsPerDay} />
-                      <IR l="Fonte de água" v={an.waterSource} />
+                    <div className="space-y-1.5">
+                      <Label>Marca / Produto</Label>
+                      <Input
+                        value={an.foodBrand ?? ""}
+                        onChange={(e) => sa("foodBrand", e.target.value)}
+                        placeholder="Ex: Royal Canin..."
+                      />
                     </div>
-                  )}
+                    <div className="space-y-1.5">
+                      <Label>Refeições por dia</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={an.feedingsPerDay ?? ""}
+                        onChange={(e) =>
+                          sa(
+                            "feedingsPerDay",
+                            e.target.value
+                              ? parseInt(e.target.value)
+                              : undefined,
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Fonte de água</Label>
+                      <Select
+                        value={an.waterSource || "__none__"}
+                        onValueChange={(v) =>
+                          sa("waterSource", v === "__none__" ? "" : v)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecionar..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">
+                            Não informado
+                          </SelectItem>
+                          <SelectItem value="filtrada">Filtrada</SelectItem>
+                          <SelectItem value="torneira">Torneira</SelectItem>
+                          <SelectItem value="mineral">Mineral</SelectItem>
+                          <SelectItem value="fonte">
+                            Bebedouro automático
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
+            </div>
+            <div className="flex justify-end mt-4">
+              <Button onClick={handleSaveAnamnesis} disabled={saving}>
+                <Save className="w-4 h-4 mr-1" />
+                {saving ? "Salvando..." : "Salvar"}
+              </Button>
             </div>
           </TabsContent>
 
@@ -1905,94 +1867,73 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {editMode ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2 space-y-2">
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={!!an.vaccinationUpToDate}
-                          onCheckedChange={(v) => sa("vaccinationUpToDate", v)}
-                          id="vac"
-                        />
-                        <Label htmlFor="vac">Vacinação em dia</Label>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={!!an.dewormingUpToDate}
-                          onCheckedChange={(v) => sa("dewormingUpToDate", v)}
-                          id="dew"
-                        />
-                        <Label htmlFor="dew">Vermifugação em dia</Label>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={!!an.heartwormPrevention}
-                          onCheckedChange={(v) => sa("heartwormPrevention", v)}
-                          id="hw"
-                        />
-                        <Label htmlFor="hw">
-                          Prevenção de filária / heartworm
-                        </Label>
-                      </div>
-                    </div>
-                    <div className="col-span-2 space-y-1.5">
-                      <Label>Protocolo vacinal</Label>
-                      <Textarea
-                        value={an.vaccinationProtocol ?? ""}
-                        onChange={(e) =>
-                          sa("vaccinationProtocol", e.target.value)
-                        }
-                        rows={2}
-                        placeholder="Ex: V10, Anti-rábica, Leishmaniose – datas de aplicação..."
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2 space-y-2">
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={!!an.vaccinationUpToDate}
+                        onCheckedChange={(v) => sa("vaccinationUpToDate", v)}
+                        id="vac"
                       />
+                      <Label htmlFor="vac">Vacinação em dia</Label>
                     </div>
-                    <div className="space-y-1.5">
-                      <Label>Última vermifugação</Label>
-                      <Input
-                        type="date"
-                        value={an.dewormingLastDate ?? ""}
-                        onChange={(e) =>
-                          sa("dewormingLastDate", e.target.value)
-                        }
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={!!an.dewormingUpToDate}
+                        onCheckedChange={(v) => sa("dewormingUpToDate", v)}
+                        id="dew"
                       />
+                      <Label htmlFor="dew">Vermifugação em dia</Label>
                     </div>
-                    <div className="space-y-1.5">
-                      <Label>Controle de ectoparasitas</Label>
-                      <Input
-                        value={an.ectoparasiteControl ?? ""}
-                        onChange={(e) =>
-                          sa("ectoparasiteControl", e.target.value)
-                        }
-                        placeholder="Ex: Bravecto, coleira Seresto, Frontline..."
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={!!an.heartwormPrevention}
+                        onCheckedChange={(v) => sa("heartwormPrevention", v)}
+                        id="hw"
                       />
+                      <Label htmlFor="hw">
+                        Prevenção de filária / heartworm
+                      </Label>
                     </div>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    <BB l="Vacinação em dia" v={!!an.vaccinationUpToDate} />
-                    <BB l="Vermifugação em dia" v={!!an.dewormingUpToDate} />
-                    <BB l="Prevenção de filária" v={!!an.heartwormPrevention} />
-                    {an.vaccinationProtocol && (
-                      <div className="col-span-2 sm:col-span-3 space-y-0.5">
-                        <p className="text-xs text-muted-foreground">
-                          Protocolo vacinal
-                        </p>
-                        <p className="text-sm">{an.vaccinationProtocol}</p>
-                      </div>
-                    )}
-                    <IR
-                      l="Última vermifugação"
-                      v={
-                        an.dewormingLastDate
-                          ? formatDate(an.dewormingLastDate)
-                          : null
+                  <div className="col-span-2 space-y-1.5">
+                    <Label>Protocolo vacinal</Label>
+                    <Textarea
+                      value={an.vaccinationProtocol ?? ""}
+                      onChange={(e) =>
+                        sa("vaccinationProtocol", e.target.value)
                       }
+                      rows={2}
+                      placeholder="Ex: V10, Anti-rábica, Leishmaniose – datas de aplicação..."
                     />
-                    <IR l="Ectoparasitas" v={an.ectoparasiteControl} />
                   </div>
-                )}
+                  <div className="space-y-1.5">
+                    <Label>Última vermifugação</Label>
+                    <Input
+                      type="date"
+                      value={an.dewormingLastDate ?? ""}
+                      onChange={(e) => sa("dewormingLastDate", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Controle de ectoparasitas</Label>
+                    <Input
+                      value={an.ectoparasiteControl ?? ""}
+                      onChange={(e) =>
+                        sa("ectoparasiteControl", e.target.value)
+                      }
+                      placeholder="Ex: Bravecto, coleira Seresto, Frontline..."
+                    />
+                  </div>
+                </div>
               </CardContent>
             </Card>
+            <div className="flex justify-end mt-4">
+              <Button onClick={handleSaveAnamnesis} disabled={saving}>
+                <Save className="w-4 h-4 mr-1" />
+                {saving ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
           </TabsContent>
           {/* HISTÓRICO MÉDICO */}
           <TabsContent value="historico">
@@ -2001,160 +1942,80 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                 <CardTitle className="text-base">Histórico Médico</CardTitle>
               </CardHeader>
               <CardContent>
-                {editMode ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2 space-y-1.5">
-                      <Label>Doenças pré-existentes / anteriores</Label>
-                      <Textarea
-                        value={an.previousDiseases ?? ""}
-                        onChange={(e) => sa("previousDiseases", e.target.value)}
-                        rows={3}
-                        placeholder="Liste doenças diagnosticadas anteriormente..."
-                      />
-                    </div>
-                    <div className="col-span-2 space-y-1.5">
-                      <Label>Cirurgias realizadas</Label>
-                      <Textarea
-                        value={an.previousSurgeries ?? ""}
-                        onChange={(e) =>
-                          sa("previousSurgeries", e.target.value)
-                        }
-                        rows={2}
-                        placeholder="Ex: castração (2022), exérese de nódulo..."
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Alergias conhecidas</Label>
-                      <Textarea
-                        value={an.knownAllergies ?? ""}
-                        onChange={(e) => sa("knownAllergies", e.target.value)}
-                        rows={2}
-                        placeholder="Alimentos, medicamentos, ambiente..."
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Condições crônicas</Label>
-                      <Textarea
-                        value={an.chronicConditions ?? ""}
-                        onChange={(e) =>
-                          sa("chronicConditions", e.target.value)
-                        }
-                        rows={2}
-                        placeholder="Ex: diabetes, epilepsia, hipotireoidismo..."
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Medicações em uso contínuo</Label>
-                      <Textarea
-                        value={an.currentMedications ?? ""}
-                        onChange={(e) =>
-                          sa("currentMedications", e.target.value)
-                        }
-                        rows={2}
-                        placeholder="Medicamentos de uso contínuo atual..."
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Tipo sanguíneo</Label>
-                      <Input
-                        value={an.bloodType ?? ""}
-                        onChange={(e) => sa("bloodType", e.target.value)}
-                        placeholder="Ex: DEA 1.1 positivo"
-                      />
-                    </div>
-                    <div className="col-span-2 space-y-1.5">
-                      <Label>Histórico reprodutivo</Label>
-                      <Textarea
-                        value={an.reproductiveHistory ?? ""}
-                        onChange={(e) =>
-                          sa("reproductiveHistory", e.target.value)
-                        }
-                        rows={2}
-                        placeholder="Ciclos de cio, gestações, partos, pseudociese..."
-                      />
-                    </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2 space-y-1.5">
+                    <Label>Doenças pré-existentes / anteriores</Label>
+                    <Textarea
+                      value={an.previousDiseases ?? ""}
+                      onChange={(e) => sa("previousDiseases", e.target.value)}
+                      rows={3}
+                      placeholder="Liste doenças diagnosticadas anteriormente..."
+                    />
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                      <IR l="Tipo sanguíneo" v={an.bloodType} />
-                    </div>
-                    {an.previousDiseases && (
-                      <div className="space-y-0.5">
-                        <p className="text-xs text-muted-foreground">
-                          Doenças anteriores
-                        </p>
-                        <p className="text-sm bg-muted rounded px-3 py-2 whitespace-pre-wrap">
-                          {an.previousDiseases}
-                        </p>
-                      </div>
-                    )}
-                    {an.previousSurgeries && (
-                      <div className="space-y-0.5">
-                        <p className="text-xs text-muted-foreground">
-                          Cirurgias realizadas
-                        </p>
-                        <p className="text-sm bg-muted rounded px-3 py-2 whitespace-pre-wrap">
-                          {an.previousSurgeries}
-                        </p>
-                      </div>
-                    )}
-                    {an.knownAllergies && (
-                      <div className="space-y-0.5">
-                        <p className="text-xs text-muted-foreground">
-                          Alergias conhecidas
-                        </p>
-                        <p className="text-sm bg-red-50 text-red-800 rounded px-3 py-2 whitespace-pre-wrap">
-                          {an.knownAllergies}
-                        </p>
-                      </div>
-                    )}
-                    {an.chronicConditions && (
-                      <div className="space-y-0.5">
-                        <p className="text-xs text-muted-foreground">
-                          Condições crônicas
-                        </p>
-                        <p className="text-sm bg-orange-50 text-orange-800 rounded px-3 py-2 whitespace-pre-wrap">
-                          {an.chronicConditions}
-                        </p>
-                      </div>
-                    )}
-                    {an.currentMedications && (
-                      <div className="space-y-0.5">
-                        <p className="text-xs text-muted-foreground">
-                          Medicações em uso contínuo
-                        </p>
-                        <p className="text-sm bg-blue-50 text-blue-800 rounded px-3 py-2 whitespace-pre-wrap">
-                          {an.currentMedications}
-                        </p>
-                      </div>
-                    )}
-                    {an.reproductiveHistory && (
-                      <div className="space-y-0.5">
-                        <p className="text-xs text-muted-foreground">
-                          Histórico reprodutivo
-                        </p>
-                        <p className="text-sm bg-muted rounded px-3 py-2 whitespace-pre-wrap">
-                          {an.reproductiveHistory}
-                        </p>
-                      </div>
-                    )}
-                    {!an.previousDiseases &&
-                      !an.previousSurgeries &&
-                      !an.knownAllergies &&
-                      !an.chronicConditions &&
-                      !an.currentMedications &&
-                      !an.bloodType &&
-                      !an.reproductiveHistory && (
-                        <p className="text-sm text-muted-foreground py-4 text-center">
-                          Nenhum histórico médico registrado. Clique em{" "}
-                          <strong>Editar</strong> para adicionar.
-                        </p>
-                      )}
+                  <div className="col-span-2 space-y-1.5">
+                    <Label>Cirurgias realizadas</Label>
+                    <Textarea
+                      value={an.previousSurgeries ?? ""}
+                      onChange={(e) => sa("previousSurgeries", e.target.value)}
+                      rows={2}
+                      placeholder="Ex: castração (2022), exérese de nódulo..."
+                    />
                   </div>
-                )}
+                  <div className="space-y-1.5">
+                    <Label>Alergias conhecidas</Label>
+                    <Textarea
+                      value={an.knownAllergies ?? ""}
+                      onChange={(e) => sa("knownAllergies", e.target.value)}
+                      rows={2}
+                      placeholder="Alimentos, medicamentos, ambiente..."
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Condições crônicas</Label>
+                    <Textarea
+                      value={an.chronicConditions ?? ""}
+                      onChange={(e) => sa("chronicConditions", e.target.value)}
+                      rows={2}
+                      placeholder="Ex: diabetes, epilepsia, hipotireoidismo..."
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Medicações em uso contínuo</Label>
+                    <Textarea
+                      value={an.currentMedications ?? ""}
+                      onChange={(e) => sa("currentMedications", e.target.value)}
+                      rows={2}
+                      placeholder="Medicamentos de uso contínuo atual..."
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Tipo sanguíneo</Label>
+                    <Input
+                      value={an.bloodType ?? ""}
+                      onChange={(e) => sa("bloodType", e.target.value)}
+                      placeholder="Ex: DEA 1.1 positivo"
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-1.5">
+                    <Label>Histórico reprodutivo</Label>
+                    <Textarea
+                      value={an.reproductiveHistory ?? ""}
+                      onChange={(e) =>
+                        sa("reproductiveHistory", e.target.value)
+                      }
+                      rows={2}
+                      placeholder="Ciclos de cio, gestações, partos, pseudociese..."
+                    />
+                  </div>
+                </div>
               </CardContent>
             </Card>
+            <div className="flex justify-end mt-4">
+              <Button onClick={handleSaveAnamnesis} disabled={saving}>
+                <Save className="w-4 h-4 mr-1" />
+                {saving ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
           </TabsContent>
           {/* RECEITUÁRIO */}
           <TabsContent value="receituario">
@@ -2596,96 +2457,64 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {editMode ? (
-                  <div className="space-y-4">
-                    <div className="space-y-1.5">
-                      <Label>Temperamento</Label>
-                      <Select
-                        value={an.temperament || "__none__"}
-                        onValueChange={(v) =>
-                          sa("temperament", v === "__none__" ? "" : v)
-                        }
-                      >
-                        <SelectTrigger className="w-64">
-                          <SelectValue placeholder="Selecionar..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">
-                            Não informado
-                          </SelectItem>
-                          <SelectItem value="docil">Dócil / Calmo</SelectItem>
-                          <SelectItem value="agitado">
-                            Agitado / Hiperativo
-                          </SelectItem>
-                          <SelectItem value="agressivo">Agressivo</SelectItem>
-                          <SelectItem value="medroso">
-                            Medroso / Ansioso
-                          </SelectItem>
-                          <SelectItem value="brincalhao">Brincalhão</SelectItem>
-                          <SelectItem value="independente">
-                            Independente
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Notas de comportamento</Label>
-                      <Textarea
-                        value={an.behaviorNotes ?? ""}
-                        onChange={(e) => sa("behaviorNotes", e.target.value)}
-                        rows={3}
-                        placeholder="Comportamentos específicos, medos, reações ao veterinário..."
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Observações clínicas gerais</Label>
-                      <Textarea
-                        value={an.clinicalObservations ?? ""}
-                        onChange={(e) =>
-                          sa("clinicalObservations", e.target.value)
-                        }
-                        rows={4}
-                        placeholder="Observações relevantes para o atendimento clínico..."
-                      />
-                    </div>
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label>Temperamento</Label>
+                    <Select
+                      value={an.temperament || "__none__"}
+                      onValueChange={(v) =>
+                        sa("temperament", v === "__none__" ? "" : v)
+                      }
+                    >
+                      <SelectTrigger className="w-64">
+                        <SelectValue placeholder="Selecionar..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Não informado</SelectItem>
+                        <SelectItem value="docil">Dócil / Calmo</SelectItem>
+                        <SelectItem value="agitado">
+                          Agitado / Hiperativo
+                        </SelectItem>
+                        <SelectItem value="agressivo">Agressivo</SelectItem>
+                        <SelectItem value="medroso">
+                          Medroso / Ansioso
+                        </SelectItem>
+                        <SelectItem value="brincalhao">Brincalhão</SelectItem>
+                        <SelectItem value="independente">
+                          Independente
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    {an.temperament && (
-                      <IR l="Temperamento" v={an.temperament} />
-                    )}
-                    {an.behaviorNotes && (
-                      <div className="space-y-0.5">
-                        <p className="text-xs text-muted-foreground">
-                          Notas de comportamento
-                        </p>
-                        <p className="text-sm bg-muted rounded px-3 py-2 whitespace-pre-wrap">
-                          {an.behaviorNotes}
-                        </p>
-                      </div>
-                    )}
-                    {an.clinicalObservations && (
-                      <div className="space-y-0.5">
-                        <p className="text-xs text-muted-foreground">
-                          Observações clínicas gerais
-                        </p>
-                        <p className="text-sm bg-yellow-50 text-yellow-900 rounded px-3 py-2 whitespace-pre-wrap">
-                          {an.clinicalObservations}
-                        </p>
-                      </div>
-                    )}
-                    {!an.temperament &&
-                      !an.behaviorNotes &&
-                      !an.clinicalObservations && (
-                        <p className="text-sm text-muted-foreground py-4 text-center">
-                          Nenhuma observação registrada. Clique em{" "}
-                          <strong>Editar</strong> para adicionar.
-                        </p>
-                      )}
+                  <div className="space-y-1.5">
+                    <Label>Notas de comportamento</Label>
+                    <Textarea
+                      value={an.behaviorNotes ?? ""}
+                      onChange={(e) => sa("behaviorNotes", e.target.value)}
+                      rows={3}
+                      placeholder="Comportamentos específicos, medos, reações ao veterinário..."
+                    />
                   </div>
-                )}
+                  <div className="space-y-1.5">
+                    <Label>Observações clínicas gerais</Label>
+                    <Textarea
+                      value={an.clinicalObservations ?? ""}
+                      onChange={(e) =>
+                        sa("clinicalObservations", e.target.value)
+                      }
+                      rows={4}
+                      placeholder="Observações relevantes para o atendimento clínico..."
+                    />
+                  </div>
+                </div>
               </CardContent>
             </Card>
+            <div className="flex justify-end mt-4">
+              <Button onClick={handleSaveAnamnesis} disabled={saving}>
+                <Save className="w-4 h-4 mr-1" />
+                {saving ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
           </TabsContent>
           {/* PRONTUÁRIO */}
           <TabsContent value="prontuario">
@@ -2713,11 +2542,10 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                   <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
                   <div className="space-y-4 pl-10">
                     {events.map((event) => {
-                      const vet = vets.find((v) => v.id === event.vetId);
                       return (
                         <div key={event.id} className="relative">
                           <div
-                            className={`absolute -left-6 top-3 w-3 h-3 rounded-full border-2 border-background ${EVT_CLR[event.type].split(" ")[0]}`}
+                            className={`absolute -left-6 top-3 w-3 h-3 rounded-full border-2 border-background ${(EVT_CLR[event.type] ?? "bg-gray-100 text-gray-800").split(" ")[0]}`}
                           />
                           <Card>
                             <CardContent className="p-4">
@@ -2725,69 +2553,54 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <span
-                                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${EVT_CLR[event.type]}`}
+                                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${EVT_CLR[event.type] ?? "bg-gray-100 text-gray-800"}`}
                                     >
-                                      {EVT_LBL[event.type]}
+                                      {EVT_LBL[event.type] ?? event.type}
                                     </span>
-                                    <p className="font-medium">{event.title}</p>
                                   </div>
                                   <p className="text-xs text-muted-foreground mt-1">
                                     {formatDate(event.date)}
-                                    {vet && ` • ${vet.name}`}
+                                    {event.vet && ` • ${event.vet.name}`}
                                   </p>
                                   {event.description && (
                                     <p className="text-sm mt-2">
                                       {event.description}
                                     </p>
                                   )}
-                                  {event.weightKg && (
-                                    <p className="text-sm mt-1">
-                                      Peso: <strong>{event.weightKg} kg</strong>
-                                    </p>
-                                  )}
-                                  {event.vaccineProtocol && (
-                                    <p className="text-sm mt-1">
-                                      Protocolo: {event.vaccineProtocol}
-                                      {event.vaccineNextDate &&
-                                        ` • Próxima: ${formatDate(event.vaccineNextDate)}`}
-                                    </p>
-                                  )}
-                                  {event.examResult && (
+                                  {event.vital_signs && (
                                     <p className="text-sm mt-1 bg-muted p-2 rounded">
-                                      {event.examResult}
+                                      <strong>Sinais vitais:</strong>{" "}
+                                      {event.vital_signs}
                                     </p>
                                   )}
-                                  {event.pathologies &&
-                                    event.pathologies.length > 0 && (
-                                      <div className="flex gap-1 mt-1 flex-wrap">
-                                        {event.pathologies.map((p) => (
-                                          <Badge
-                                            key={p}
-                                            variant="outline"
-                                            className="text-xs"
-                                          >
-                                            {p}
-                                          </Badge>
-                                        ))}
-                                      </div>
-                                    )}
-                                  {event.prescriptionItems &&
-                                    event.prescriptionItems.length > 0 && (
-                                      <div className="mt-2 space-y-1">
-                                        {event.prescriptionItems.map(
-                                          (item, i) => (
-                                            <p
-                                              key={i}
-                                              className="text-xs bg-orange-50 text-orange-800 rounded px-2 py-1"
-                                            >
-                                              {item.medication} – {item.dosage}{" "}
-                                              / {item.frequency} /{" "}
-                                              {item.duration}
-                                            </p>
-                                          ),
-                                        )}
-                                      </div>
-                                    )}
+                                  {event.diagnosis && (
+                                    <p className="text-sm mt-1">
+                                      <strong>Diagnóstico:</strong>{" "}
+                                      {event.diagnosis}
+                                    </p>
+                                  )}
+                                  {event.treatment && (
+                                    <p className="text-sm mt-1">
+                                      <strong>Tratamento:</strong>{" "}
+                                      {event.treatment}
+                                    </p>
+                                  )}
+                                  {event.exams && (
+                                    <p className="text-sm mt-1 bg-muted p-2 rounded">
+                                      <strong>Exames:</strong> {event.exams}
+                                    </p>
+                                  )}
+                                  {event.medications && (
+                                    <p className="text-sm mt-1 bg-orange-50 text-orange-800 rounded px-2 py-1">
+                                      <strong>Medicações:</strong>{" "}
+                                      {event.medications}
+                                    </p>
+                                  )}
+                                  {event.notes && (
+                                    <p className="text-sm mt-1 text-muted-foreground italic">
+                                      {event.notes}
+                                    </p>
+                                  )}
                                 </div>
                                 {event.type === "prescription" && (
                                   <Button
