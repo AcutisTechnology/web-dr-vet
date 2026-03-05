@@ -87,6 +87,7 @@ export const hospitalizationService = {
     hospId: string,
     prescId: string,
     payload: {
+      scheduled_time: string;
       administered_at: string;
       administered_by: string;
       notes?: string;

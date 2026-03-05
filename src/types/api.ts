@@ -287,11 +287,12 @@ export interface ApiBox {
 
 export interface ApiMedAdministration {
   id: string;
-  hospitalization_id: string;
-  prescription_id: string;
-  administered_at: string;
-  administered_by: string;
+  hosp_prescription_id: string;
+  scheduled_time: string;
+  administered_at: string | null;
+  administered_by: string | null;
   notes: string | null;
+  status: "pending" | "done" | "late" | "skipped";
   created_at: string;
   updated_at: string;
 }

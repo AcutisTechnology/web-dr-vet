@@ -107,6 +107,7 @@ export default function InternacaoPage() {
     slotTime: Date;
   } | null>(null);
   const [doseNotes, setDoseNotes] = useState("");
+  const [administeredTime, setAdministeredTime] = useState("");
   const [boxDialogOpen, setBoxDialogOpen] = useState(false);
   const [editingBox, setEditingBox] = useState<ApiBox | null>(null);
   const [boxForm, setBoxForm] = useState<StoreBoxPayload & { active: boolean }>(
@@ -250,7 +251,7 @@ export default function InternacaoPage() {
       hospId: string;
       payload: Parameters<typeof hospitalizationService.addPrescription>[1];
     }) => hospitalizationService.addPrescription(hospId, payload),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ title: "Prescrição adicionada" });
       setPrescDialogOpen(false);
       setPrescForm({
@@ -261,7 +262,11 @@ export default function InternacaoPage() {
         notes: "",
         daysAhead: "3",
       });
-      invalidate();
+      await invalidate();
+      if (selected) {
+        const updated = await hospitalizationService.get(selected.id);
+        setSelected(updated);
+      }
     },
     onError: () =>
       toast({ title: "Erro ao adicionar prescrição", variant: "destructive" }),
@@ -271,27 +276,35 @@ export default function InternacaoPage() {
     mutationFn: ({
       hospId,
       prescId,
+      scheduledTime,
       administeredAt,
       notes,
     }: {
       hospId: string;
       prescId: string;
+      scheduledTime: string;
       administeredAt: string;
       notes?: string;
     }) =>
       hospitalizationService.addAdministration(hospId, prescId, {
+        scheduled_time: scheduledTime,
         administered_at: administeredAt,
         administered_by: currentUser?.name ?? currentUser?.id ?? "Equipe",
         notes,
       }),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({
         title: "Dose confirmada!",
         description: "Administração registrada com sucesso",
       });
       setConfirmingDose(null);
       setDoseNotes("");
-      invalidate();
+      setAdministeredTime("");
+      await invalidate();
+      if (selected) {
+        const updated = await hospitalizationService.get(selected.id);
+        setSelected(updated);
+      }
     },
     onError: () =>
       toast({ title: "Erro ao confirmar dose", variant: "destructive" }),
@@ -300,10 +313,14 @@ export default function InternacaoPage() {
   const deletePrescMutation = useMutation({
     mutationFn: ({ hospId, prescId }: { hospId: string; prescId: string }) =>
       hospitalizationService.deletePrescription(hospId, prescId),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ title: "Prescrição excluída" });
       setExpandedPresc(null);
-      invalidate();
+      await invalidate();
+      if (selected) {
+        const updated = await hospitalizationService.get(selected.id);
+        setSelected(updated);
+      }
     },
   });
 
@@ -397,7 +414,15 @@ export default function InternacaoPage() {
   };
 
   const handleAddPrescription = () => {
-    if (!selected || !prescForm.medication) return;
+    if (!selected || !prescForm.medication || !prescForm.dosage) return;
+
+    const startDate = new Date();
+    const endDate = new Date();
+    // daysAhead = 3 means 3 days total (today + 2 more days), so add (daysAhead - 1)
+    endDate.setDate(
+      endDate.getDate() + parseInt(prescForm.daysAhead || "3") - 1,
+    );
+
     addPrescMutation.mutate({
       hospId: selected.id,
       payload: {
@@ -405,7 +430,8 @@ export default function InternacaoPage() {
         dosage: prescForm.dosage,
         frequency: prescForm.frequency || "8/8h",
         route: prescForm.route || undefined,
-        start_date: new Date().toISOString(),
+        start_date: startDate.toISOString().split("T")[0],
+        end_date: endDate.toISOString().split("T")[0],
         notes: prescForm.notes || undefined,
       },
     });
@@ -700,49 +726,38 @@ export default function InternacaoPage() {
                     ) : (
                       <div className="space-y-4">
                         {(selected.prescriptions ?? []).map((p) => {
-                          const freqH = parseFrequencyHours(p.frequency);
-                          const start = new Date(p.start_date);
-                          const end = p.end_date ? new Date(p.end_date) : null;
                           const now = new Date();
 
-                          // Generate all dose slots from start up to now+freqH
-                          const slots: Date[] = [];
-                          const cursor = new Date(start);
-                          // align start to nearest dose slot
-                          while (
-                            cursor <= new Date(now.getTime() + freqH * 3600_000)
-                          ) {
-                            if (!end || cursor <= end) {
-                              slots.push(new Date(cursor));
-                            }
-                            cursor.setHours(cursor.getHours() + freqH);
-                          }
-
-                          // Administrations already done
-                          const admins = p.administrations ?? [];
-
-                          // For each slot, check if an admin exists within ±(freqH/2) hours
-                          const tolerance = (freqH / 2) * 3600_000;
-                          const slotsWithStatus = slots.map((slot) => {
-                            const given = admins.find(
-                              (a) =>
-                                Math.abs(
-                                  new Date(a.administered_at).getTime() -
-                                    slot.getTime(),
-                                ) <= tolerance,
-                            );
-                            return { slot, given: given ?? null };
-                          });
-
-                          // Show only past/current slots (up to now)
-                          const pastSlots = slotsWithStatus.filter(
-                            (s) => s.slot <= now,
+                          // Use doses from backend (administrations)
+                          const allDoses = (p.administrations ?? []).map(
+                            (admin) => ({
+                              id: admin.id,
+                              scheduledTime: new Date(admin.scheduled_time),
+                              administeredAt: admin.administered_at
+                                ? new Date(admin.administered_at)
+                                : null,
+                              administeredBy: admin.administered_by,
+                              notes: admin.notes,
+                              status: admin.status as
+                                | "pending"
+                                | "done"
+                                | "late"
+                                | "skipped",
+                            }),
                           );
+
+                          // Sort by scheduled time
+                          allDoses.sort(
+                            (a, b) =>
+                              a.scheduledTime.getTime() -
+                              b.scheduledTime.getTime(),
+                          );
+
                           const isExpanded = expandedPresc === p.id;
-                          const doneCount = pastSlots.filter(
-                            (s) => s.given,
+                          const doneCount = allDoses.filter(
+                            (d) => d.status === "done",
                           ).length;
-                          const totalPast = pastSlots.length;
+                          const totalDoses = allDoses.length;
 
                           return (
                             <div
@@ -771,15 +786,15 @@ export default function InternacaoPage() {
                                       </p>
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
-                                      {totalPast > 0 && (
+                                      {totalDoses > 0 && (
                                         <span
                                           className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                                            doneCount === totalPast
+                                            doneCount === totalDoses
                                               ? "bg-green-100 text-green-700"
                                               : "bg-amber-100 text-amber-700"
                                           }`}
                                         >
-                                          {doneCount}/{totalPast}
+                                          {doneCount}/{totalDoses}
                                         </span>
                                       )}
                                       {selected.status === "active" && (
@@ -810,42 +825,57 @@ export default function InternacaoPage() {
                               </div>
 
                               {/* Dose slots */}
-                              {pastSlots.length === 0 ? (
+                              {allDoses.length === 0 ? (
                                 <div className="px-4 py-3 text-xs text-muted-foreground">
-                                  Nenhuma dose programada até agora
+                                  Nenhuma dose programada
                                 </div>
                               ) : (
                                 <div className="divide-y">
-                                  {pastSlots.map(({ slot, given }, idx) => {
-                                    const isPast = slot < now;
-                                    const isLate = isPast && !given;
+                                  {allDoses.map((dose) => {
+                                    const isPast = dose.scheduledTime < now;
+                                    const isLate = dose.status === "late";
+                                    const isDone = dose.status === "done";
+                                    const isFuture = dose.scheduledTime > now;
                                     return (
                                       <div
-                                        key={idx}
+                                        key={dose.id}
                                         className={`flex items-center gap-3 px-4 py-2.5 ${
-                                          given
+                                          isDone
                                             ? "bg-green-50"
                                             : isLate
                                               ? "bg-red-50"
-                                              : "bg-white"
+                                              : isFuture
+                                                ? "bg-blue-50/30"
+                                                : "bg-white"
                                         }`}
                                       >
                                         <button
                                           disabled={
-                                            !!given ||
+                                            isDone ||
+                                            isFuture ||
                                             selected.status !== "active" ||
                                             confirmDoseMutation.isPending
                                           }
                                           onClick={() => {
                                             setConfirmingDose({
                                               presc: p,
-                                              slotTime: slot,
+                                              slotTime: dose.scheduledTime,
                                             });
                                             setDoseNotes("");
+                                            const now = new Date();
+                                            const hours = String(
+                                              now.getHours(),
+                                            ).padStart(2, "0");
+                                            const minutes = String(
+                                              now.getMinutes(),
+                                            ).padStart(2, "0");
+                                            setAdministeredTime(
+                                              `${hours}:${minutes}`,
+                                            );
                                           }}
                                           className="shrink-0 disabled:opacity-60"
                                         >
-                                          {given ? (
+                                          {isDone ? (
                                             <CheckSquare className="w-5 h-5 text-green-600" />
                                           ) : (
                                             <Square className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
@@ -855,7 +885,7 @@ export default function InternacaoPage() {
                                           <div className="flex items-center gap-2 flex-wrap">
                                             <Clock className="w-3 h-3 text-muted-foreground" />
                                             <span className="text-sm font-medium">
-                                              {slot.toLocaleTimeString(
+                                              {dose.scheduledTime.toLocaleTimeString(
                                                 "pt-BR",
                                                 {
                                                   hour: "2-digit",
@@ -863,7 +893,7 @@ export default function InternacaoPage() {
                                                 },
                                               )}
                                               {" • "}
-                                              {slot.toLocaleDateString(
+                                              {dose.scheduledTime.toLocaleDateString(
                                                 "pt-BR",
                                                 {
                                                   day: "2-digit",
@@ -877,60 +907,26 @@ export default function InternacaoPage() {
                                               </span>
                                             )}
                                           </div>
-                                          {given && (
+                                          {isDone && dose.administeredAt && (
                                             <p className="text-xs text-green-700 mt-0.5">
                                               <CheckCheck className="w-3 h-3 inline mr-1" />
                                               Administrado{" "}
-                                              {new Date(
-                                                given.administered_at,
-                                              ).toLocaleTimeString("pt-BR", {
-                                                hour: "2-digit",
-                                                minute: "2-digit",
-                                              })}
+                                              {dose.administeredAt.toLocaleTimeString(
+                                                "pt-BR",
+                                                {
+                                                  hour: "2-digit",
+                                                  minute: "2-digit",
+                                                },
+                                              )}
                                               {" por "}
-                                              {given.administered_by}
-                                              {given.notes &&
-                                                ` • ${given.notes}`}
+                                              {dose.administeredBy}
+                                              {dose.notes && ` • ${dose.notes}`}
                                             </p>
                                           )}
                                         </div>
                                       </div>
                                     );
                                   })}
-                                </div>
-                              )}
-
-                              {/* Expanded history: future slots */}
-                              {isExpanded && (
-                                <div className="border-t bg-muted/30 px-4 py-2 space-y-1">
-                                  <p className="text-xs font-semibold text-muted-foreground mb-2">
-                                    Próximas doses programadas
-                                  </p>
-                                  {slotsWithStatus
-                                    .filter((s) => s.slot > now)
-                                    .slice(0, 6)
-                                    .map(({ slot }, idx) => (
-                                      <div
-                                        key={idx}
-                                        className="flex items-center gap-2 text-xs text-muted-foreground"
-                                      >
-                                        <Clock className="w-3 h-3" />
-                                        {slot.toLocaleDateString("pt-BR", {
-                                          day: "2-digit",
-                                          month: "short",
-                                        })}{" "}
-                                        {slot.toLocaleTimeString("pt-BR", {
-                                          hour: "2-digit",
-                                          minute: "2-digit",
-                                        })}
-                                      </div>
-                                    ))}
-                                  {slotsWithStatus.filter((s) => s.slot > now)
-                                    .length === 0 && (
-                                    <p className="text-xs text-muted-foreground">
-                                      Sem doses futuras
-                                    </p>
-                                  )}
                                 </div>
                               )}
                             </div>
@@ -1304,6 +1300,14 @@ export default function InternacaoPage() {
                 </p>
               </div>
               <div className="space-y-1.5">
+                <Label>Hora da Administração *</Label>
+                <Input
+                  type="time"
+                  value={administeredTime}
+                  onChange={(e) => setAdministeredTime(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
                 <Label>Observações (opcional)</Label>
                 <Textarea
                   value={doseNotes}
@@ -1320,18 +1324,28 @@ export default function InternacaoPage() {
               onClick={() => {
                 setConfirmingDose(null);
                 setDoseNotes("");
+                setAdministeredTime("");
               }}
             >
               Cancelar
             </Button>
             <Button
-              disabled={confirmDoseMutation.isPending}
+              disabled={confirmDoseMutation.isPending || !administeredTime}
               onClick={() => {
-                if (!selected || !confirmingDose) return;
+                if (!selected || !confirmingDose || !administeredTime) return;
+
+                // Combine today's date with the selected time
+                const [hours, minutes] = administeredTime.split(":");
+                const administeredDate = new Date();
+                administeredDate.setHours(parseInt(hours, 10));
+                administeredDate.setMinutes(parseInt(minutes, 10));
+                administeredDate.setSeconds(0);
+
                 confirmDoseMutation.mutate({
                   hospId: selected.id,
                   prescId: confirmingDose.presc.id,
-                  administeredAt: new Date().toISOString(),
+                  scheduledTime: confirmingDose.slotTime.toISOString(),
+                  administeredAt: administeredDate.toISOString(),
                   notes: doseNotes || undefined,
                 });
               }}

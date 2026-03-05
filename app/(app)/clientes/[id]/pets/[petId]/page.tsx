@@ -422,13 +422,39 @@ export default function PetDetailPage() {
   const handleSavePetFinance = async () => {
     if (!pet) return;
 
-    const incomeCategory = categories.find((c) => c.type === "income");
-    const expenseCategory = categories.find((c) => c.type === "expense");
-    const activeAccount = accounts.find((a) => a.active);
+    // Auto-create default categories and account if they don't exist
+    let incomeCategory = categories.find((c) => c.type === "income");
+    let expenseCategory = categories.find((c) => c.type === "expense");
+    let activeAccount = accounts.find((a) => a.active);
 
-    if (!incomeCategory || !expenseCategory || !activeAccount) {
+    try {
+      if (!incomeCategory) {
+        const newCategory = await financeService.createCategory({
+          name: "Receitas",
+          type: "income",
+        });
+        incomeCategory = newCategory;
+      }
+
+      if (!expenseCategory) {
+        const newCategory = await financeService.createCategory({
+          name: "Despesas",
+          type: "expense",
+        });
+        expenseCategory = newCategory;
+      }
+
+      if (!activeAccount) {
+        const newAccount = await financeService.createAccount({
+          name: "Conta Principal",
+          type: "checking",
+          balance: 0,
+        });
+        activeAccount = newAccount;
+      }
+    } catch (error) {
       toast({
-        title: "Configure categorias e contas no módulo Financeiro primeiro",
+        title: "Erro ao criar categorias/contas padrão",
         variant: "destructive",
       });
       return;
