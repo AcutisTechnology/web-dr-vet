@@ -2,7 +2,8 @@ import axios from "axios";
 import { useSessionStore } from "@/stores/session";
 
 export const apiClient = axios.create({
-  baseURL: "https://api.drvet.app.br/api",
+  // baseURL: "https://api.drvet.app.br/api",
+  baseURL: "http://localhost:8000/api",
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",

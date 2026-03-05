@@ -37,8 +37,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { petService } from "@/services/pet.service";
 import { clientService } from "@/services/client.service";
 import { medicalEventService } from "@/services/medical-event.service";
+import { financeService } from "@/services/finance.service";
 import { adaptApiPetToPet } from "@/adapters/pet.adapter";
 import { adaptApiClientToClient } from "@/adapters/client.adapter";
+import { adaptApiFinanceEntryToFinanceEntry } from "@/adapters/finance.adapter";
 import type { ApiMedicalEvent } from "@/types/api";
 import type { Pet, Client, PetAnamnesis, FinanceEntry } from "@/types";
 import { useSessionStore } from "@/stores/session";
@@ -293,9 +295,13 @@ export default function PetDetailPage() {
   });
   const events = apiEvents as ApiMedicalEvent[];
   const loading = loadingPet || loadingClient;
-  const [petFinanceEntries, setPetFinanceEntries] = useState<FinanceEntry[]>(
-    [],
-  );
+  const { data: apiFinanceEntries = [], isLoading: loadingFinance } = useQuery({
+    queryKey: ["finance-entries", "pet", petId],
+    queryFn: () => financeService.listEntriesByPet(petId),
+    select: (data) => data.map(adaptApiFinanceEntryToFinanceEntry),
+    enabled: !!petId,
+  });
+  const petFinanceEntries = apiFinanceEntries;
   const [financeDialogOpen, setFinanceDialogOpen] = useState(false);
   const [financeForm, setFinanceForm] = useState({
     petFinanceType: "consultation" as
@@ -383,183 +389,161 @@ export default function PetDetailPage() {
   };
   const petFinanceSummary = {
     revenue: petFinanceEntries
-      .filter(
-        (e) =>
-          !e.fromSale &&
-          PET_FINANCE_INCOME_TYPES.includes(e.petFinanceType ?? ""),
-      )
+      .filter((e) => !e.fromSale && e.type === "income")
       .reduce((s, e) => s + e.amount, 0),
     cost: petFinanceEntries
-      .filter(
-        (e) =>
-          !e.fromSale &&
-          !PET_FINANCE_INCOME_TYPES.includes(e.petFinanceType ?? "") &&
-          !!e.petId,
-      )
+      .filter((e) => !e.fromSale && e.type === "expense")
       .reduce((s, e) => s + e.amount, 0),
     pdvRevenue: petFinanceEntries
       .filter((e) => e.fromSale)
       .reduce((s, e) => s + e.amount, 0),
   };
-  const refreshFinance = (_petId: string) => {
-    // Finance API integration pending — local state only for now
+  const refreshFinance = () => {
+    qc.invalidateQueries({ queryKey: ["finance-entries", "pet", petId] });
+    qc.invalidateQueries({ queryKey: ["finance-entries"] });
   };
+  const { data: categories = [] } = useQuery({
+    queryKey: ["finance-categories"],
+    queryFn: () => financeService.listCategories(),
+  });
+
+  const { data: accounts = [] } = useQuery({
+    queryKey: ["finance-accounts"],
+    queryFn: () => financeService.listAccounts(),
+  });
+
+  const createFinanceMutation = useMutation({
+    mutationFn: financeService.createEntry,
+    onSuccess: () => {
+      refreshFinance();
+    },
+  });
+
   const handleSavePetFinance = async () => {
     if (!pet) return;
-    const dueDate = new Date(financeForm.date + "T12:00:00").toISOString();
 
-    if (financeForm.petFinanceType === "exam") {
-      const charge = parseFloat(financeForm.examCharge);
-      const lab = parseFloat(financeForm.examLab);
-      if (!financeForm.examCharge && !financeForm.examLab) {
-        toast({
-          title: "Informe ao menos um valor para o exame",
-          variant: "destructive",
-        });
-        return;
-      }
-      const desc = financeForm.description || `Exame – ${pet.name}`;
-      const now = new Date().toISOString();
-      if (financeForm.examCharge && charge > 0) {
-        setPetFinanceEntries((prev) => [
-          {
-            id: crypto.randomUUID(),
+    const incomeCategory = categories.find((c) => c.type === "income");
+    const expenseCategory = categories.find((c) => c.type === "expense");
+    const activeAccount = accounts.find((a) => a.active);
+
+    if (!incomeCategory || !expenseCategory || !activeAccount) {
+      toast({
+        title: "Configure categorias e contas no módulo Financeiro primeiro",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const dueDate = financeForm.date;
+
+    try {
+      if (financeForm.petFinanceType === "exam") {
+        const charge = parseFloat(financeForm.examCharge);
+        const lab = parseFloat(financeForm.examLab);
+        if (!financeForm.examCharge && !financeForm.examLab) {
+          toast({
+            title: "Informe ao menos um valor para o exame",
+            variant: "destructive",
+          });
+          return;
+        }
+        const desc = financeForm.description || `Exame – ${pet.name}`;
+        if (financeForm.examCharge && charge > 0) {
+          await createFinanceMutation.mutateAsync({
             type: "income",
             description: `${desc} (cobrado do cliente)`,
             amount: charge,
-            dueDate,
+            due_date: dueDate,
             status: "paid",
-            paidDate: dueDate,
-            categoryId: "fc1",
-            paymentMethod: financeForm.paymentMethod,
-            petId: pet.id,
-            petFinanceType: "exam_charge",
-            fromSale: false,
-            recurring: false,
-            createdAt: now,
-            updatedAt: now,
-          } as FinanceEntry,
-          ...prev,
-        ]);
-      }
-      if (financeForm.examLab && lab > 0) {
-        setPetFinanceEntries((prev) => [
-          {
-            id: crypto.randomUUID(),
+            category_id: incomeCategory.id,
+            account_id: activeAccount.id,
+            payment_method: financeForm.paymentMethod,
+            pet_id: pet.id,
+          });
+        }
+        if (financeForm.examLab && lab > 0) {
+          await createFinanceMutation.mutateAsync({
             type: "expense",
             description: `${desc} (laboratório)`,
             amount: lab,
-            dueDate,
+            due_date: dueDate,
             status: "paid",
-            paidDate: dueDate,
-            categoryId: "fc7",
-            paymentMethod: financeForm.paymentMethod,
-            petId: pet.id,
-            petFinanceType: "exam_lab",
-            fromSale: false,
-            recurring: false,
-            createdAt: now,
-            updatedAt: now,
-          } as FinanceEntry,
-          ...prev,
-        ]);
-      }
-    } else if (financeForm.petFinanceType === "medication") {
-      const charge = parseFloat(financeForm.medCharge);
-      const cost = parseFloat(financeForm.medCost);
-      if (!financeForm.medCharge && !financeForm.medCost) {
-        toast({
-          title: "Informe ao menos um valor para a medicação",
-          variant: "destructive",
-        });
-        return;
-      }
-      const desc = financeForm.description || `Medicação – ${pet.name}`;
-      const now2 = new Date().toISOString();
-      if (financeForm.medCharge && charge > 0) {
-        setPetFinanceEntries((prev) => [
-          {
-            id: crypto.randomUUID(),
+            category_id: expenseCategory.id,
+            account_id: activeAccount.id,
+            payment_method: financeForm.paymentMethod,
+            pet_id: pet.id,
+          });
+        }
+      } else if (financeForm.petFinanceType === "medication") {
+        const charge = parseFloat(financeForm.medCharge);
+        const cost = parseFloat(financeForm.medCost);
+        if (!financeForm.medCharge && !financeForm.medCost) {
+          toast({
+            title: "Informe ao menos um valor para a medicação",
+            variant: "destructive",
+          });
+          return;
+        }
+        const desc = financeForm.description || `Medicação – ${pet.name}`;
+        if (financeForm.medCharge && charge > 0) {
+          await createFinanceMutation.mutateAsync({
             type: "income",
             description: `${desc} (cobrado do cliente)`,
             amount: charge,
-            dueDate,
+            due_date: dueDate,
             status: "paid",
-            paidDate: dueDate,
-            categoryId: "fc1",
-            paymentMethod: financeForm.paymentMethod,
-            petId: pet.id,
-            petFinanceType: "medication_charge",
-            fromSale: false,
-            recurring: false,
-            createdAt: now2,
-            updatedAt: now2,
-          } as FinanceEntry,
-          ...prev,
-        ]);
-      }
-      if (financeForm.medCost && cost > 0) {
-        setPetFinanceEntries((prev) => [
-          {
-            id: crypto.randomUUID(),
+            category_id: incomeCategory.id,
+            account_id: activeAccount.id,
+            payment_method: financeForm.paymentMethod,
+            pet_id: pet.id,
+          });
+        }
+        if (financeForm.medCost && cost > 0) {
+          await createFinanceMutation.mutateAsync({
             type: "expense",
             description: `${desc} (custo)`,
             amount: cost,
-            dueDate,
+            due_date: dueDate,
             status: "paid",
-            paidDate: dueDate,
-            categoryId: "fc7",
-            paymentMethod: financeForm.paymentMethod,
-            petId: pet.id,
-            petFinanceType: "medication_cost",
-            fromSale: false,
-            recurring: false,
-            createdAt: now2,
-            updatedAt: now2,
-          } as FinanceEntry,
-          ...prev,
-        ]);
-      }
-    } else {
-      if (!financeForm.description || !financeForm.amount) {
-        toast({
-          title: "Descrição e valor são obrigatórios",
-          variant: "destructive",
-        });
-        return;
-      }
-      const isIncome = PET_FINANCE_INCOME_TYPES.includes(
-        financeForm.petFinanceType,
-      );
-      const now3 = new Date().toISOString();
-      setPetFinanceEntries((prev) => [
-        {
-          id: crypto.randomUUID(),
+            category_id: expenseCategory.id,
+            account_id: activeAccount.id,
+            payment_method: financeForm.paymentMethod,
+            pet_id: pet.id,
+          });
+        }
+      } else {
+        if (!financeForm.description || !financeForm.amount) {
+          toast({
+            title: "Descrição e valor são obrigatórios",
+            variant: "destructive",
+          });
+          return;
+        }
+        const isIncome = PET_FINANCE_INCOME_TYPES.includes(
+          financeForm.petFinanceType,
+        );
+        await createFinanceMutation.mutateAsync({
           type: isIncome ? "income" : "expense",
           description: financeForm.description,
           amount: parseFloat(financeForm.amount),
-          dueDate,
+          due_date: dueDate,
           status: "paid",
-          paidDate: dueDate,
-          categoryId: isIncome ? "fc1" : "fc7",
-          paymentMethod: financeForm.paymentMethod,
-          petId: pet.id,
-          petFinanceType: financeForm.petFinanceType as
-            | "consultation"
-            | "material"
-            | "fuel",
-          fromSale: false,
-          recurring: false,
-          createdAt: now3,
-          updatedAt: now3,
-        } as FinanceEntry,
-        ...prev,
-      ]);
-    }
+          category_id: isIncome ? incomeCategory.id : expenseCategory.id,
+          account_id: activeAccount.id,
+          payment_method: financeForm.paymentMethod,
+          pet_id: pet.id,
+        });
+      }
 
-    toast({ title: "Registro financeiro salvo" });
-    setFinanceDialogOpen(false);
-    refreshFinance(pet.id);
+      toast({ title: "Registro financeiro salvo" });
+      setFinanceDialogOpen(false);
+      refreshFinance();
+    } catch (error) {
+      toast({
+        title: "Erro ao salvar registro financeiro",
+        variant: "destructive",
+      });
+    }
   };
 
   const sf = (field: keyof typeof form, value: string | boolean) => {

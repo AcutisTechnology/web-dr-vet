@@ -7,12 +7,15 @@ export interface ApiFinanceEntry {
   account_id: string;
   pet_id: string | null;
   due_date: string;
+  paid_date?: string | null;
   amount: number | string;
   description: string;
   status: "paid" | "pending" | "overdue" | "cancelled";
   payment_method: string | null;
   recurring: boolean | string | null;
   notes: string | null;
+  pet_finance_type?: string | null;
+  from_sale?: boolean;
   category?: { id: string; name: string; type: string };
   account?: { id: string; name: string; type: string; balance: number };
   pet?: { id: string; name: string } | null;
@@ -127,6 +130,13 @@ export const financeService = {
     const { data } = await apiClient.post<ApiFinanceAccount>(
       "/finance-accounts",
       payload,
+    );
+    return data;
+  },
+
+  listEntriesByPet: async (petId: string): Promise<ApiFinanceEntry[]> => {
+    const { data } = await apiClient.get<ApiFinanceEntry[]>(
+      `/finance-entries/pet/${petId}`,
     );
     return data;
   },

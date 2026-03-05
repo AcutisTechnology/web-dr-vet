@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import {
   Plus,
   Search,
@@ -37,7 +37,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { productsDb, stockMovesDb } from "@/mocks/db";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { productService } from "@/services/product.service";
+import { stockService } from "@/services/stock.service";
+import { adaptApiProductToProduct } from "@/adapters/product.adapter";
+import { adaptApiStockMoveToStockMove } from "@/adapters/stock.adapter";
 import type { Product, StockMove } from "@/types";
 import { formatCurrency, formatDate, exportToCSV } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -61,11 +65,9 @@ const categoryLabels: Record<string, string> = {
 
 export default function EstoquePage() {
   const { toast } = useToast();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [moves, setMoves] = useState<StockMove[]>([]);
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -89,25 +91,26 @@ export default function EstoquePage() {
     unitCost: "",
   });
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [prds, mvs] = await Promise.all([
-      productsDb.findAll(),
-      stockMovesDb.findAll(),
-    ]);
-    setProducts(prds.sort((a, b) => a.name.localeCompare(b.name)));
-    setMoves(
-      mvs.sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      ),
-    );
-    setLoading(false);
-  }, []);
+  const { data: apiProducts = [], isLoading: loadingProducts } = useQuery({
+    queryKey: ["products"],
+    queryFn: () => productService.list(),
+  });
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { data: apiMoves = [], isLoading: loadingMoves } = useQuery({
+    queryKey: ["stock-moves"],
+    queryFn: () => stockService.listMoves(),
+  });
+
+  const products = apiProducts
+    .map(adaptApiProductToProduct)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const moves = apiMoves
+    .map(adaptApiStockMoveToStockMove)
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  const loading = loadingProducts || loadingMoves;
 
   const filtered = products.filter((p) => {
     const matchSearch =
@@ -153,6 +156,31 @@ export default function EstoquePage() {
     setDialogOpen(true);
   };
 
+  const createProductMutation = useMutation({
+    mutationFn: productService.create,
+    onSuccess: () => {
+      toast({ title: "Produto cadastrado" });
+      qc.invalidateQueries({ queryKey: ["products"] });
+      setDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Erro ao cadastrar produto", variant: "destructive" });
+    },
+  });
+
+  const updateProductMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: any }) =>
+      productService.update(id, payload),
+    onSuccess: () => {
+      toast({ title: "Produto atualizado" });
+      qc.invalidateQueries({ queryKey: ["products"] });
+      setDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Erro ao atualizar produto", variant: "destructive" });
+    },
+  });
+
   const handleSave = async () => {
     if (!form.name) {
       toast({ title: "Nome é obrigatório", variant: "destructive" });
@@ -160,26 +188,21 @@ export default function EstoquePage() {
     }
     const payload = {
       name: form.name,
-      sku: form.sku || undefined,
       category: form.category,
       unit: form.unit,
-      costPrice: parseFloat(form.costPrice) || 0,
-      salePrice: parseFloat(form.salePrice) || 0,
+      cost_price: parseFloat(form.costPrice) || 0,
+      sale_price: parseFloat(form.salePrice) || 0,
       stock: parseInt(form.stock) || 0,
-      minStock: parseInt(form.minStock) || 0,
-      supplier: form.supplier || undefined,
-      expirationDate: form.expirationDate || undefined,
+      min_stock: parseInt(form.minStock) || 0,
+      barcode: form.sku || undefined,
+      notes: form.supplier || undefined,
       active: true,
     };
     if (editingProduct) {
-      await productsDb.update(editingProduct.id, payload);
-      toast({ title: "Produto atualizado" });
+      updateProductMutation.mutate({ id: editingProduct.id, payload });
     } else {
-      await productsDb.create(payload);
-      toast({ title: "Produto cadastrado" });
+      createProductMutation.mutate(payload);
     }
-    setDialogOpen(false);
-    load();
   };
 
   const openMove = (p: Product) => {
@@ -188,32 +211,34 @@ export default function EstoquePage() {
     setMoveDialogOpen(true);
   };
 
+  const createMoveMutation = useMutation({
+    mutationFn: stockService.createMove,
+    onSuccess: () => {
+      toast({ title: "Movimentação registrada" });
+      qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["stock-moves"] });
+      setMoveDialogOpen(false);
+    },
+    onError: () => {
+      toast({
+        title: "Erro ao registrar movimentação",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleMove = async () => {
     if (!selectedProduct || !moveForm.quantity) {
       toast({ title: "Quantidade é obrigatória", variant: "destructive" });
       return;
     }
     const qty = parseInt(moveForm.quantity);
-    await stockMovesDb.create({
-      productId: selectedProduct.id,
+    createMoveMutation.mutate({
+      product_id: selectedProduct.id,
       type: moveForm.type,
       quantity: qty,
-      reason: moveForm.reason,
-      unitCost: moveForm.unitCost ? parseFloat(moveForm.unitCost) : undefined,
-      userId: "u3",
+      reason: moveForm.reason || undefined,
     });
-    const delta =
-      moveForm.type === "in"
-        ? qty
-        : moveForm.type === "out" || moveForm.type === "loss"
-          ? -qty
-          : 0;
-    await productsDb.update(selectedProduct.id, {
-      stock: Math.max(0, selectedProduct.stock + delta),
-    });
-    toast({ title: "Movimentação registrada" });
-    setMoveDialogOpen(false);
-    load();
   };
 
   const handleExport = () => {
