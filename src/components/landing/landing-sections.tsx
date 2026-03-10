@@ -389,7 +389,7 @@ export function LandingPlans() {
                   Começar agora <ArrowRight className="w-4 h-4" />
                 </Link>
                 <p className="text-white/50 text-xs mt-3">
-                  14 dias grátis · Sem cartão de crédito
+                  3 dias grátis · Sem cartão de crédito
                 </p>
               </div>
 
@@ -470,7 +470,7 @@ export function LandingCTA() {
           Comece a transformar sua clínica hoje
         </h2>
         <p className="text-white/80 mt-4 text-lg">
-          14 dias grátis, sem cartão de crédito, sem compromisso.
+          3 dias grátis, sem cartão de crédito, sem compromisso.
         </p>
         <div className="flex flex-wrap justify-center gap-4 mt-8">
           <Link

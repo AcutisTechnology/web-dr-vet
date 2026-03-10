@@ -175,7 +175,7 @@ export function LandingHero() {
           <div className="flex flex-wrap gap-6 pt-1 text-sm text-gray-500">
             {[
               "Sem cartão de crédito",
-              "14 dias grátis",
+              "3 dias grátis",
               "Cancele quando quiser",
             ].map((t) => (
               <span key={t} className="flex items-center gap-1.5">

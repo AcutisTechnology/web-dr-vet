@@ -186,7 +186,7 @@ export default function CadastroPage() {
           </p>
           <ul className="mt-8 space-y-3">
             {[
-              "14 dias grátis, sem cartão de crédito",
+              "3 dias grátis, sem cartão de crédito",
               "Usuários ilimitados inclusos",
               "Todos os módulos desde o primeiro dia",
               "Suporte prioritário via chat",

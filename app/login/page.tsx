@@ -67,9 +67,6 @@ function LoginContent() {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-[#1B2A6B] to-[#2DC6C6] bg-clip-text text-transparent">
               DrVet
             </h1>
-            <p className="text-muted-foreground text-sm">
-              SaaS &amp; Community for Vets
-            </p>
           </div>
         </div>
 
