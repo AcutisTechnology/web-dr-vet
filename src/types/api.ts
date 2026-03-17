@@ -205,6 +205,7 @@ export interface StorePetPayload {
   notes?: string;
   neutered?: boolean;
   status?: string;
+  anamnesis?: Record<string, unknown>;
 }
 
 export interface StoreAppointmentPayload {

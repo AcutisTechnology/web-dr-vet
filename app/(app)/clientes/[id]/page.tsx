@@ -227,31 +227,32 @@ export default function ClienteDetailPage() {
     );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
+        <Button variant="ghost" size="icon" onClick={() => router.back()} className="shrink-0">
           <ArrowLeft className="w-4 h-4" />
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold">{client.name}</h1>
-          <p className="text-muted-foreground text-sm">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold truncate">{client.name}</h1>
+          <p className="text-muted-foreground text-sm truncate">
             {client.phone} {client.email && `• ${client.email}`}
           </p>
         </div>
       </div>
 
       <Tabs defaultValue="pets">
-        <TabsList>
-          <TabsTrigger value="pets">Pets ({pets.length})</TabsTrigger>
-          <TabsTrigger value="prontuario" disabled={!effectivePet}>
+        <TabsList className="w-full sm:w-auto">
+          <TabsTrigger value="pets" className="flex-1 sm:flex-none">Pets ({pets.length})</TabsTrigger>
+          <TabsTrigger value="prontuario" disabled={!effectivePet} className="flex-1 sm:flex-none">
             Prontuário
           </TabsTrigger>
-          <TabsTrigger value="info">Dados do Cliente</TabsTrigger>
+          <TabsTrigger value="info" className="flex-1 sm:flex-none">Dados do Cliente</TabsTrigger>
         </TabsList>
 
         {/* ── Pets tab ── */}
         <TabsContent value="pets" className="space-y-3 mt-4">
-          <div className="flex justify-end">
+          <div className="flex justify-between items-center gap-2">
+            <p className="text-sm text-muted-foreground">{pets.length} pet{pets.length !== 1 ? "s" : ""} cadastrado{pets.length !== 1 ? "s" : ""}</p>
             <Link href={`/clientes/${id}/pets/new`}>
               <Button size="sm">
                 <Plus className="w-4 h-4 mr-1" /> Novo Pet
@@ -265,7 +266,7 @@ export default function ClienteDetailPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {pets.map((pet) => (
                 <Card
                   key={pet.id}
@@ -473,7 +474,7 @@ export default function ClienteDetailPage() {
         <TabsContent value="info" className="mt-4">
           <Card>
             <CardContent className="p-6 space-y-3">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-muted-foreground">Nome</p>
                   <p className="font-medium">{client.name}</p>
@@ -522,12 +523,12 @@ export default function ClienteDetailPage() {
 
       {/* ── Event Dialog ── */}
       <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Novo Evento – {effectivePet?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Tipo</Label>
                 <Select

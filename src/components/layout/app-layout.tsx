@@ -10,6 +10,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useSessionStore();
   const router = useRouter();
   const [hydrated, setHydrated] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     setHydrated(true);
@@ -25,10 +26,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-muted/30">
-      <Sidebar />
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <Topbar />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+      <Sidebar
+        mobileOpen={mobileMenuOpen}
+        onMobileClose={() => setMobileMenuOpen(false)}
+      />
+      <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+        <Topbar onMobileMenuToggle={() => setMobileMenuOpen((v) => !v)} />
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6">{children}</main>
       </div>
       <Toaster />
     </div>

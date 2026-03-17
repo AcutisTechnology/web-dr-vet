@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsContent } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -34,6 +34,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { VerticalTabs } from "@/components/ui/vertical-tabs";
 import { petService } from "@/services/pet.service";
 import { clientService } from "@/services/client.service";
 import { medicalEventService } from "@/services/medical-event.service";
@@ -322,6 +323,7 @@ export default function PetDetailPage() {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [activeTab, setActiveTab] = useState("dados");
   const [form, setForm] = useState({
     name: "",
     species: "dog" as Pet["species"],
@@ -1109,27 +1111,27 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <Link href={`/clientes/${clientId}`}>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" className="shrink-0">
               <ChevronLeft className="w-5 h-5" />
             </Button>
           </Link>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-bold">{pet.name}</h1>
+              <h1 className="text-lg sm:text-xl font-bold">{pet.name}</h1>
               {pet.status === "deceased" && (
                 <Badge variant="destructive">Óbito</Badge>
               )}
               {dirty && <Badge variant="secondary">Não salvo</Badge>}
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground truncate">
               {SP[pet.species]} • {pet.breed} • Tutor: {client?.name}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={handlePrintAnamnesis}>
+          <Button variant="outline" size="sm" onClick={handlePrintAnamnesis} className="hidden sm:flex">
             <Printer className="w-4 h-4 mr-1" />
             Imprimir Anamnese
           </Button>
@@ -1193,71 +1195,23 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
         </div>
       </div>
 
-      <Tabs defaultValue="dados" className="flex gap-6">
-        {/* Sidebar Navigation */}
-        <div className="w-56 shrink-0">
-          <div className="sticky top-4 space-y-1">
-            <TabsList className="flex flex-col h-auto w-full bg-transparent p-0 gap-1">
-              <TabsTrigger
-                value="dados"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Identificação
-              </TabsTrigger>
-              <TabsTrigger
-                value="queixas"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Queixa Atual
-              </TabsTrigger>
-              <TabsTrigger
-                value="historico"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Histórico Médico
-              </TabsTrigger>
-              <TabsTrigger
-                value="ambiente"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Rotina e Alimentação
-              </TabsTrigger>
-              <TabsTrigger
-                value="preventivos"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Preventivos
-              </TabsTrigger>
-              <TabsTrigger
-                value="obs"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Comportamento
-              </TabsTrigger>
-              <TabsTrigger
-                value="receituario"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Receituário
-              </TabsTrigger>
-              <TabsTrigger
-                value="prontuario"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Prontuário ({events.length})
-              </TabsTrigger>
-              <TabsTrigger
-                value="financeiro"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Financeiro
-              </TabsTrigger>
-            </TabsList>
-          </div>
-        </div>
-
-        {/* Main Content Area */}
-        <div className="flex-1 min-w-0 space-y-4">
+      <VerticalTabs
+        tabs={[
+          { value: "dados", label: "Identificação" },
+          { value: "queixas", label: "Queixa Atual" },
+          { value: "historico", label: "Histórico Médico" },
+          { value: "ambiente", label: "Rotina e Alimentação" },
+          { value: "preventivos", label: "Preventivos" },
+          { value: "obs", label: "Comportamento" },
+          { value: "receituario", label: "Receituário" },
+          { value: "prontuario", label: `Prontuário (${events.length})` },
+          { value: "financeiro", label: "Financeiro" },
+        ]}
+        value={activeTab}
+        onValueChange={setActiveTab}
+      >
+        {/* conteúdo das tabs — div wrapper para manter space-y-4 */}
+        <div>
           {/* DADOS BÁSICOS */}
           <TabsContent value="dados">
             <Card>
@@ -1266,8 +1220,8 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
               </CardHeader>
               <CardContent>
                 {editMode ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2 space-y-1.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-2 space-y-1.5">
                       <Label>Nome *</Label>
                       <Input
                         value={form.name}
@@ -1346,7 +1300,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                         onChange={(e) => sf("microchip", e.target.value)}
                       />
                     </div>
-                    <div className="col-span-2 flex items-center gap-3">
+                    <div className="sm:col-span-2 flex items-center gap-3">
                       <Switch
                         checked={form.neutered}
                         onCheckedChange={(v) => sf("neutered", v)}
@@ -1354,7 +1308,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                       />
                       <Label htmlFor="neu">Castrado(a)</Label>
                     </div>
-                    <div className="col-span-2 space-y-1.5">
+                    <div className="sm:col-span-2 space-y-1.5">
                       <Label>Observações gerais</Label>
                       <Textarea
                         value={form.notes}
@@ -1680,7 +1634,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                   <CardTitle className="text-base">Ambiente e Rotina</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label>Ambiente</Label>
                       <Select
@@ -1744,7 +1698,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                         placeholder="Ex: 2x ao dia..."
                       />
                     </div>
-                    <div className="col-span-2 space-y-2">
+                    <div className="sm:col-span-2 space-y-2">
                       <div className="flex items-center gap-3">
                         <Switch
                           checked={!!an.contactWithOtherAnimals}
@@ -1778,7 +1732,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                   <CardTitle className="text-base">Alimentação</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label>Tipo de alimentação</Label>
                       <Select
@@ -1877,8 +1831,8 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2 space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2 space-y-2">
                     <div className="flex items-center gap-3">
                       <Switch
                         checked={!!an.vaccinationUpToDate}
@@ -1906,7 +1860,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                       </Label>
                     </div>
                   </div>
-                  <div className="col-span-2 space-y-1.5">
+                  <div className="sm:col-span-2 space-y-1.5">
                     <Label>Protocolo vacinal</Label>
                     <Textarea
                       value={an.vaccinationProtocol ?? ""}
@@ -1952,8 +1906,8 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                 <CardTitle className="text-base">Histórico Médico</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2 space-y-1.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2 space-y-1.5">
                     <Label>Doenças pré-existentes / anteriores</Label>
                     <Textarea
                       value={an.previousDiseases ?? ""}
@@ -1962,7 +1916,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                       placeholder="Liste doenças diagnosticadas anteriormente..."
                     />
                   </div>
-                  <div className="col-span-2 space-y-1.5">
+                  <div className="sm:col-span-2 space-y-1.5">
                     <Label>Cirurgias realizadas</Label>
                     <Textarea
                       value={an.previousSurgeries ?? ""}
@@ -2006,7 +1960,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                       placeholder="Ex: DEA 1.1 positivo"
                     />
                   </div>
-                  <div className="col-span-2 space-y-1.5">
+                  <div className="sm:col-span-2 space-y-1.5">
                     <Label>Histórico reprodutivo</Label>
                     <Textarea
                       value={an.reproductiveHistory ?? ""}
@@ -2048,7 +2002,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     <div className="space-y-1.5">
                       <Label>Clínica</Label>
                       <Input
@@ -2124,9 +2078,9 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                   {rx.items.map((item, idx) => (
                     <div
                       key={idx}
-                      className="grid grid-cols-2 md:grid-cols-6 gap-3 p-3 border rounded-lg bg-muted/30"
+                      className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 p-3 border rounded-lg bg-muted/30"
                     >
-                      <div className="col-span-2 md:col-span-2 space-y-1">
+                      <div className="sm:col-span-2 md:col-span-2 space-y-1">
                         <Label className="text-xs">Medicamento *</Label>
                         <Input
                           value={item.medication}
@@ -2271,7 +2225,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="col-span-2 md:col-span-4 space-y-1">
+                      <div className="sm:col-span-2 md:col-span-4 space-y-1">
                         <Label className="text-xs">Obs. deste item</Label>
                         <Input
                           value={item.notes}
@@ -2476,7 +2430,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                         sa("temperament", v === "__none__" ? "" : v)
                       }
                     >
-                      <SelectTrigger className="w-64">
+                      <SelectTrigger className="w-full sm:w-64">
                         <SelectValue placeholder="Selecionar..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -3099,7 +3053,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
             </Dialog>
           </TabsContent>
         </div>
-      </Tabs>
+      </VerticalTabs>
     </div>
   );
 }

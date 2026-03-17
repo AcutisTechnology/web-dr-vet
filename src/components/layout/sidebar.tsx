@@ -12,6 +12,8 @@ import {
   ChevronLeft,
   ChevronRight,
   UserCog,
+  CreditCard,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -26,17 +28,32 @@ const navItems = [
   { href: "/estoque", label: "Estoque", icon: Package },
   { href: "/financeiro", label: "Financeiro", icon: DollarSign },
   { href: "/usuarios", label: "Usuários", icon: UserCog },
+  { href: "/assinatura", label: "Assinatura", icon: CreditCard },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+}
+
+function SidebarContent({
+  collapsed,
+  setCollapsed,
+  onMobileClose,
+  isMobile = false,
+}: {
+  collapsed: boolean;
+  setCollapsed: (v: boolean) => void;
+  onMobileClose?: () => void;
+  isMobile?: boolean;
+}) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
 
   return (
     <aside
       className={cn(
-        "relative flex flex-col text-white transition-all duration-300 shrink-0 overflow-hidden",
-        collapsed ? "w-16" : "w-60",
+        "relative flex flex-col text-white transition-all duration-300 shrink-0 overflow-hidden h-full",
+        isMobile ? "w-64" : collapsed ? "w-16" : "w-60",
       )}
       style={{
         background:
@@ -58,10 +75,10 @@ export function Sidebar() {
       <div
         className={cn(
           "relative z-10 flex items-center gap-3 px-4 py-5",
-          collapsed ? "justify-center px-2" : "",
+          !isMobile && collapsed ? "justify-center px-2" : "",
         )}
       >
-        {collapsed ? (
+        {!isMobile && collapsed ? (
           <div
             className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
             style={{
@@ -94,11 +111,20 @@ export function Sidebar() {
                 className="object-cover"
               />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="font-bold text-sm leading-tight tracking-widest uppercase text-white">
                 DrVet
               </p>
             </div>
+            {isMobile && onMobileClose && (
+              <button
+                onClick={onMobileClose}
+                className="text-white/60 hover:text-white transition-colors ml-auto"
+                aria-label="Fechar menu"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -120,9 +146,10 @@ export function Sidebar() {
             <Link
               key={href}
               href={href}
+              onClick={isMobile ? onMobileClose : undefined}
               className={cn(
                 "group relative flex items-center gap-3 py-2.5 rounded-xl text-sm transition-all duration-200",
-                collapsed ? "justify-center px-0" : "px-3",
+                !isMobile && collapsed ? "justify-center px-0" : "px-3",
                 active
                   ? "text-white font-medium"
                   : "text-white/45 hover:text-white/80",
@@ -146,7 +173,7 @@ export function Sidebar() {
                 if (!active)
                   (e.currentTarget as HTMLElement).style.background = "";
               }}
-              title={collapsed ? label : undefined}
+              title={!isMobile && collapsed ? label : undefined}
             >
               <Icon
                 className="w-[18px] h-[18px] shrink-0 transition-all duration-200"
@@ -159,11 +186,11 @@ export function Sidebar() {
                     : undefined
                 }
               />
-              {!collapsed && (
+              {(isMobile || !collapsed) && (
                 <span className="tracking-wide text-[13px]">{label}</span>
               )}
               {/* Dot indicador no collapsed */}
-              {active && collapsed && (
+              {active && !isMobile && collapsed && (
                 <span
                   className="absolute right-1 top-1 w-1.5 h-1.5 rounded-full"
                   style={{
@@ -178,7 +205,7 @@ export function Sidebar() {
       </nav>
 
       {/* Rodapé */}
-      {!collapsed && (
+      {(isMobile || !collapsed) && (
         <div className="relative z-10 px-4 py-3">
           <div
             className="h-px mb-3 opacity-20"
@@ -193,23 +220,67 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Collapse toggle */}
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-22 z-20 flex items-center justify-center w-6 h-6 rounded-full text-white/60 hover:text-white transition-all duration-200"
-        style={{
-          background: "linear-gradient(135deg, #0d2b3e, #0f2a2a)",
-          border: "1px solid rgba(45,198,198,0.3)",
-          boxShadow: "0 0 10px rgba(45,198,198,0.15)",
-        }}
-        aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-      >
-        {collapsed ? (
-          <ChevronRight className="w-3 h-3" />
-        ) : (
-          <ChevronLeft className="w-3 h-3" />
-        )}
-      </button>
+      {/* Collapse toggle — desktop only */}
+      {!isMobile && (
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="absolute -right-3 top-22 z-20 flex items-center justify-center w-6 h-6 rounded-full text-white/60 hover:text-white transition-all duration-200"
+          style={{
+            background: "linear-gradient(135deg, #0d2b3e, #0f2a2a)",
+            border: "1px solid rgba(45,198,198,0.3)",
+            boxShadow: "0 0 10px rgba(45,198,198,0.15)",
+          }}
+          aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+        >
+          {collapsed ? (
+            <ChevronRight className="w-3 h-3" />
+          ) : (
+            <ChevronLeft className="w-3 h-3" />
+          )}
+        </button>
+      )}
     </aside>
+  );
+}
+
+export function Sidebar({
+  mobileOpen = false,
+  onMobileClose,
+}: SidebarProps) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <div className="hidden md:flex">
+        <SidebarContent
+          collapsed={collapsed}
+          setCollapsed={setCollapsed}
+        />
+      </div>
+
+      {/* Mobile drawer backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={onMobileClose}
+        />
+      )}
+
+      {/* Mobile drawer */}
+      <div
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 md:hidden transition-transform duration-300",
+          mobileOpen ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
+        <SidebarContent
+          collapsed={false}
+          setCollapsed={() => {}}
+          onMobileClose={onMobileClose}
+          isMobile
+        />
+      </div>
+    </>
   );
 }

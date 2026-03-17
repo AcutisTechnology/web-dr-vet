@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsContent } from "@/components/ui/tabs";
+import { VerticalTabs } from "@/components/ui/vertical-tabs";
 import {
   Select,
   SelectContent,
@@ -194,6 +195,7 @@ export default function NewPetPage() {
   const [anamnesis, setAnamnesis] = useState<PetAnamnesis>({
     ...emptyAnamnesis,
   });
+  const [activeTab, setActiveTab] = useState("dados");
   const sa2 = (field: keyof PetAnamnesis) => (v: string) =>
     setAnamnesis((a) => ({ ...a, [field]: v }));
 
@@ -222,6 +224,7 @@ export default function NewPetPage() {
         weight: form.weight ? parseFloat(form.weight) : undefined,
         microchip: form.microchip || undefined,
         notes: form.notes || undefined,
+        anamnesis: anamnesis as Record<string, unknown>,
       },
       {
         onSuccess: () => {
@@ -263,61 +266,27 @@ export default function NewPetPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="dados" className="flex gap-6">
-        {/* Sidebar Navigation */}
-        <div className="w-56 shrink-0">
-          <div className="sticky top-4 space-y-1">
-            <TabsList className="flex flex-col h-auto w-full bg-transparent p-0 gap-1">
-              <TabsTrigger
-                value="dados"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Identificação
-              </TabsTrigger>
-              <TabsTrigger
-                value="queixas"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Queixa Atual
-              </TabsTrigger>
-              <TabsTrigger
-                value="historico"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Histórico Médico
-              </TabsTrigger>
-              <TabsTrigger
-                value="ambiente"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Rotina e Alimentação
-              </TabsTrigger>
-              <TabsTrigger
-                value="preventivos"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Preventivos
-              </TabsTrigger>
-              <TabsTrigger
-                value="obs"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Comportamento
-              </TabsTrigger>
-            </TabsList>
-          </div>
-        </div>
-
-        {/* Main Content Area */}
-        <div className="flex-1 min-w-0 space-y-4">
+      <VerticalTabs
+        tabs={[
+          { value: "dados", label: "Identificação" },
+          { value: "queixas", label: "Queixa Atual" },
+          { value: "historico", label: "Histórico Médico" },
+          { value: "ambiente", label: "Rotina e Alimentação" },
+          { value: "preventivos", label: "Preventivos" },
+          { value: "obs", label: "Comportamento" },
+        ]}
+        value={activeTab}
+        onValueChange={setActiveTab}
+      >
+        <div>
           {/* ── DADOS BÁSICOS ── */}
           <TabsContent value="dados">
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Identificação</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 space-y-1.5">
+              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2 space-y-1.5">
                   <Label>Nome *</Label>
                   <Input
                     value={form.name}
@@ -398,7 +367,7 @@ export default function NewPetPage() {
                     placeholder="Número do microchip"
                   />
                 </div>
-                <div className="col-span-2 flex items-center gap-3">
+                <div className="sm:col-span-2 flex items-center gap-3">
                   <Switch
                     checked={form.neutered}
                     onCheckedChange={(v) => sf("neutered", v)}
@@ -406,7 +375,7 @@ export default function NewPetPage() {
                   />
                   <Label htmlFor="neutered-new">Castrado(a)</Label>
                 </div>
-                <div className="col-span-2 space-y-1.5">
+                <div className="sm:col-span-2 space-y-1.5">
                   <Label>Observações gerais</Label>
                   <Textarea
                     value={form.notes}
@@ -696,7 +665,7 @@ export default function NewPetPage() {
               <CardHeader>
                 <CardTitle className="text-base">Ambiente e Rotina</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4">
+              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label>Ambiente</Label>
                   <Select
@@ -756,7 +725,7 @@ export default function NewPetPage() {
                     placeholder="Ex: 2x ao dia, raramente..."
                   />
                 </div>
-                <div className="col-span-2 flex flex-col gap-3">
+                <div className="sm:col-span-2 flex flex-col gap-3">
                   <div className="flex items-center gap-3">
                     <Switch
                       checked={!!anamnesis.contactWithOtherAnimals}
@@ -778,9 +747,9 @@ export default function NewPetPage() {
                     </Label>
                   </div>
                 </div>
-                <div className="col-span-2 pt-2 border-t">
+                <div className="sm:col-span-2 pt-2 border-t">
                   <p className="text-sm font-medium mb-3">Alimentação</p>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label>Tipo de alimentação</Label>
                       <Select
@@ -877,8 +846,8 @@ export default function NewPetPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2 flex items-center gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2 flex items-center gap-3">
                     <Switch
                       checked={!!anamnesis.vaccinationUpToDate}
                       onCheckedChange={(v) => sa("vaccinationUpToDate", v)}
@@ -886,7 +855,7 @@ export default function NewPetPage() {
                     />
                     <Label htmlFor="vac-ok">Vacinação em dia</Label>
                   </div>
-                  <div className="col-span-2 space-y-1.5">
+                  <div className="sm:col-span-2 space-y-1.5">
                     <Label>Protocolo vacinal</Label>
                     <Textarea
                       value={anamnesis.vaccinationProtocol ?? ""}
@@ -1066,7 +1035,7 @@ export default function NewPetPage() {
             </Card>
           </TabsContent>
         </div>
-      </Tabs>
+      </VerticalTabs>
     </div>
   );
 }

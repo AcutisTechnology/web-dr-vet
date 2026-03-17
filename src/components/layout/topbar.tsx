@@ -6,7 +6,7 @@ import {
   User,
   Building2,
   Stethoscope,
-  Settings,
+  Menu,
 } from "lucide-react";
 import { useSessionStore } from "@/stores/session";
 import { useRouter } from "next/navigation";
@@ -22,7 +22,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Breadcrumbs } from "./breadcrumbs";
 
-export function Topbar() {
+interface TopbarProps {
+  onMobileMenuToggle?: () => void;
+}
+
+export function Topbar({ onMobileMenuToggle }: TopbarProps) {
   const { user, logout } = useSessionStore();
   const router = useRouter();
 
@@ -40,11 +44,23 @@ export function Topbar() {
       .toUpperCase() ?? "?";
 
   return (
-    <header className="h-14 border-b bg-background flex items-center px-6 gap-4 shrink-0">
-      <div className="flex-1">
+    <header className="h-14 border-b bg-background flex items-center px-3 sm:px-6 gap-2 sm:gap-4 shrink-0">
+      {/* Hamburguer — mobile only */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="md:hidden shrink-0"
+        onClick={onMobileMenuToggle}
+        aria-label="Abrir menu"
+      >
+        <Menu className="w-5 h-5" />
+      </Button>
+
+      <div className="flex-1 min-w-0 overflow-hidden">
         <Breadcrumbs />
       </div>
-      <div className="flex items-center gap-2">
+
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
         <Button
           variant="ghost"
           size="icon"

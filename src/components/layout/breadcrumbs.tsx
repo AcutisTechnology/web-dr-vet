@@ -42,7 +42,8 @@ function useResolvedLabel(segments: string[], index: number): string {
   const prev2 = segments[index - 2];
 
   const isClientId = isUuid(seg) && prev === "clientes";
-  const isPetId = isUuid(seg) && prev === "pets" && prev2 === "clientes";
+  // path: /clientes/[clientId]/pets/[petId]  → prev="pets", prev2=clientUUID
+  const isPetId = isUuid(seg) && prev === "pets" && isUuid(prev2);
 
   const { data: client } = useQuery({
     queryKey: ["clients", seg],
