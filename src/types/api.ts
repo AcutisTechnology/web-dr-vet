@@ -208,6 +208,46 @@ export interface StorePetPayload {
   anamnesis?: Record<string, unknown>;
 }
 
+// ─── AI Diagnosis ─────────────────────────────────────────────────────────────
+
+export interface AiDiagnosisItem {
+  name: string;
+  confidence: "alta" | "média" | "baixa";
+  justification: string;
+  icd_vet?: string;
+}
+
+export interface AiExamItem {
+  name: string;
+  priority: "urgente" | "recomendado" | "opcional";
+  reason: string;
+}
+
+export interface AiMedicationItem {
+  class: string;
+  example: string;
+  indication: string;
+  caution?: string;
+}
+
+export interface AiDiagnosisResult {
+  summary: string;
+  diagnoses: AiDiagnosisItem[];
+  exams: AiExamItem[];
+  medications: AiMedicationItem[];
+  observations: string;
+  disclaimer: string;
+}
+
+export interface AiDiagnosisSavePayload {
+  summary: string;
+  diagnoses: AiDiagnosisItem[];
+  exams?: AiExamItem[];
+  medications?: AiMedicationItem[];
+  observations?: string;
+  disclaimer?: string;
+}
+
 export interface StoreAppointmentPayload {
   pet_id: string;
   client_id: string;

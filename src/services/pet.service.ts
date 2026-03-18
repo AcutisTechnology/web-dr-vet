@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { ApiPet, StorePetPayload } from "@/types/api";
+import type { ApiPet, StorePetPayload, AiDiagnosisResult, AiDiagnosisSavePayload } from "@/types/api";
 
 export const petService = {
   list: async (params?: Record<string, string>): Promise<ApiPet[]> => {
@@ -42,6 +42,20 @@ export const petService = {
     anamnesis: Record<string, unknown>,
   ): Promise<void> => {
     await apiClient.patch(`/pets/${id}/anamnesis`, { anamnesis });
+  },
+
+  aiDiagnosis: async (id: string): Promise<AiDiagnosisResult> => {
+    const { data } = await apiClient.post<{ data: AiDiagnosisResult }>(
+      `/pets/${id}/ai-diagnosis`,
+    );
+    return data.data;
+  },
+
+  saveAiDiagnosis: async (
+    id: string,
+    payload: AiDiagnosisSavePayload,
+  ): Promise<void> => {
+    await apiClient.post(`/pets/${id}/ai-diagnosis/save`, payload);
   },
 
   delete: async (id: string): Promise<void> => {

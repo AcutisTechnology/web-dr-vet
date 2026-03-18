@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { VerticalTabs } from "@/components/ui/vertical-tabs";
+import { AiDiagnosisTab } from "@/components/pet/ai-diagnosis-tab";
 import { petService } from "@/services/pet.service";
 import { clientService } from "@/services/client.service";
 import { medicalEventService } from "@/services/medical-event.service";
@@ -1203,6 +1204,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
           { value: "ambiente", label: "Rotina e Alimentação" },
           { value: "preventivos", label: "Preventivos" },
           { value: "obs", label: "Comportamento" },
+          { value: "ia", label: "✨ Diagnóstico IA" },
           { value: "receituario", label: "Receituário" },
           { value: "prontuario", label: `Prontuário (${events.length})` },
           { value: "financeiro", label: "Financeiro" },
@@ -1981,6 +1983,15 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
               </Button>
             </div>
           </TabsContent>
+          {/* DIAGNÓSTICO IA */}
+          <TabsContent value="ia">
+            <AiDiagnosisTab
+              petId={petId}
+              petName={pet.name}
+              hasAnamnesis={!!pet.anamnesis && Object.keys(pet.anamnesis).length > 0}
+            />
+          </TabsContent>
+
           {/* RECEITUÁRIO */}
           <TabsContent value="receituario">
             <div className="space-y-4">
