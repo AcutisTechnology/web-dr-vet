@@ -8,7 +8,7 @@ import { Eye, EyeOff, Lock, CheckCircle2, AlertCircle, Loader2 } from "lucide-re
 import { useSessionStore } from "@/stores/session";
 import { adaptApiUserToUser } from "@/adapters/auth.adapter";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api").replace(/\/+$/, "");
 
 function SetPasswordForm() {
   const searchParams = useSearchParams();
