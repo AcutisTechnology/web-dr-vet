@@ -237,7 +237,7 @@ export default function AgendaPage() {
     if (!win) return;
     win.document.write(`
       <html><head><title>Agendamento</title>
-      <style>body{font-family:Arial;padding:20px}h2{color:#333}table{width:100%;border-collapse:collapse}td{padding:8px;border-bottom:1px solid #eee}</style>
+      <style>body{font-family:Poppins,Arial,sans-serif;padding:20px}h2{color:#1b2a6b}table{width:100%;border-collapse:collapse}td{padding:8px;border-bottom:1px solid #dde3ee}</style>
       </head><body>
       <h2>VetDom – Comprovante de Agendamento</h2>
       <table>
@@ -248,7 +248,7 @@ export default function AgendaPage() {
         <tr><td><b>Horário:</b></td><td>${appt.startTime} – ${appt.endTime}</td></tr>
         ${appt.notes ? `<tr><td><b>Observações:</b></td><td>${appt.notes}</td></tr>` : ""}
       </table>
-      <p style="margin-top:30px;font-size:12px;color:#666">Impresso em ${new Date().toLocaleString("pt-BR")}</p>
+      <p style="margin-top:30px;font-size:12px;color:#5e6b85">Impresso em ${new Date().toLocaleString("pt-BR")}</p>
       </body></html>
     `);
     win.print();
@@ -257,10 +257,10 @@ export default function AgendaPage() {
   const isSaving = createAppt.isPending || updateAppt.isPending;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 font-sans">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Agenda</h1>
+          <h1 className="text-2xl font-bold text-primary [font-family:var(--font-heading)]">Agenda</h1>
           <p className="text-muted-foreground text-sm">
             Gerenciamento de agendamentos
           </p>
@@ -344,9 +344,9 @@ export default function AgendaPage() {
                     <button
                       key={appt.id}
                       onClick={() => openEdit(appt)}
-                      className="w-full text-left p-1.5 rounded bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors"
+                      className="w-full text-left p-1.5 rounded bg-info/8 border border-info/25 hover:bg-info/14 transition-colors"
                     >
-                      <p className="text-xs font-medium text-blue-900 truncate">
+                      <p className="text-xs font-medium text-primary truncate">
                         {appt.startTime} {appt.serviceType}
                       </p>
                       <Badge

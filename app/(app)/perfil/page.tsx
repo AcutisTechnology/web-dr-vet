@@ -38,11 +38,11 @@ import { supabase, LOGO_BUCKET } from "@/lib/supabase";
 const ACCOUNT_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   clinic_owner: {
     label: "Administrador da Clínica",
-    color: "bg-[#1B2A6B]/10 text-[#1B2A6B]",
+    color: "bg-primary/10 text-primary",
   },
   clinic_user: {
     label: "Usuário da Clínica",
-    color: "bg-[#2DC6C6]/10 text-[#2DC6C6]",
+    color: "bg-accent/15 text-primary",
   },
   autonomous: {
     label: "Veterinário Autônomo",
@@ -231,10 +231,10 @@ export default function PerfilPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6 font-sans">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-[#1B2A6B]">Meu Perfil</h1>
+        <h1 className="text-2xl font-bold text-primary [font-family:var(--font-heading)]">Meu Perfil</h1>
         <p className="text-muted-foreground text-sm mt-1">
           Gerencie suas informações pessoais e de acesso
         </p>
@@ -248,7 +248,7 @@ export default function PerfilPage() {
               {currentLogoUrl ? (
                 <AvatarImage src={currentLogoUrl} alt={user.name} className="object-cover" />
               ) : null}
-              <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-[#1B2A6B] to-[#2DC6C6] text-white">
+              <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-primary to-accent text-white">
                 {initials}
               </AvatarFallback>
             </Avatar>
@@ -291,7 +291,7 @@ export default function PerfilPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <ImageIcon className="w-4 h-4 text-[#1B2A6B]" />
+            <ImageIcon className="w-4 h-4 text-primary" />
             Logo da {user.accountType === "autonomous" ? "Clínica / Perfil" : "Clínica"}
           </CardTitle>
           <CardDescription>
@@ -339,7 +339,7 @@ export default function PerfilPage() {
                       onClick={handleUploadLogo}
                       disabled={uploadingLogo}
                       size="sm"
-                      className="bg-[#1B2A6B] hover:bg-[#1B2A6B]/90"
+                      className="bg-primary hover:bg-primary/90"
                     >
                       {uploadingLogo ? (
                         <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando...</>
@@ -371,7 +371,7 @@ export default function PerfilPage() {
                       disabled={uploadingLogo}
                       size="sm"
                       variant="outline"
-                      className="border-[#1B2A6B] text-[#1B2A6B] hover:bg-[#1B2A6B]/5"
+                      className="border-primary text-primary hover:bg-primary/5"
                     >
                       <Upload className="w-4 h-4 mr-2" />
                       {currentLogoUrl ? "Trocar logo" : "Enviar logo"}
@@ -415,7 +415,7 @@ export default function PerfilPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <User className="w-4 h-4 text-[#1B2A6B]" />
+            <User className="w-4 h-4 text-primary" />
             Dados Pessoais
           </CardTitle>
           <CardDescription>
@@ -479,7 +479,7 @@ export default function PerfilPage() {
             <Button
               onClick={handleSaveProfile}
               disabled={savingProfile}
-              className="bg-[#1B2A6B] hover:bg-[#1B2A6B]/90"
+              className="bg-primary hover:bg-primary/90"
             >
               <Save className="w-4 h-4 mr-2" />
               {savingProfile ? "Salvando..." : "Salvar alterações"}
@@ -494,7 +494,7 @@ export default function PerfilPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Lock className="w-4 h-4 text-[#1B2A6B]" />
+            <Lock className="w-4 h-4 text-primary" />
             Alterar Senha
           </CardTitle>
           <CardDescription>
@@ -580,7 +580,7 @@ export default function PerfilPage() {
               <p
                 className={`text-xs flex items-center gap-1 mt-1 ${
                   passwordForm.next === passwordForm.confirm
-                    ? "text-emerald-600"
+                    ? "text-success"
                     : "text-destructive"
                 }`}
               >
@@ -596,7 +596,7 @@ export default function PerfilPage() {
               onClick={handleSavePassword}
               disabled={savingPassword}
               variant="outline"
-              className="border-[#1B2A6B] text-[#1B2A6B] hover:bg-[#1B2A6B]/5"
+              className="border-primary text-primary hover:bg-primary/5"
             >
               <Lock className="w-4 h-4 mr-2" />
               {savingPassword ? "Alterando..." : "Alterar senha"}

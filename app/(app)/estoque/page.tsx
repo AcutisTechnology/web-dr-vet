@@ -266,10 +266,10 @@ export default function EstoquePage() {
     );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 font-sans">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-2xl font-bold">Estoque</h1>
+          <h1 className="text-2xl font-bold text-primary [font-family:var(--font-heading)]">Estoque</h1>
           <p className="text-muted-foreground text-sm">
             {products.filter((p) => p.active).length} produtos ativos
           </p>
@@ -286,11 +286,11 @@ export default function EstoquePage() {
 
       {/* Alerts */}
       {lowStock.length > 0 && (
-        <Card className="border-amber-200 bg-amber-50">
+        <Card className="border-warning/30 bg-warning/10">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600" />
-              <p className="text-sm font-medium text-amber-800">
+              <AlertTriangle className="w-4 h-4 text-[color:var(--warning)]" />
+              <p className="text-sm font-medium text-[color:var(--warning)]">
                 {lowStock.length} produto(s) com estoque baixo
               </p>
             </div>
@@ -385,7 +385,7 @@ export default function EstoquePage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <span
-                          className={`font-medium ${isOut ? "text-destructive" : isLow ? "text-amber-600" : "text-green-600"}`}
+                          className={`font-medium ${isOut ? "text-destructive" : isLow ? "text-[color:var(--warning)]" : "text-success"}`}
                         >
                           {p.stock} {p.unit}
                         </span>
@@ -475,7 +475,7 @@ export default function EstoquePage() {
                       <TableCell className="text-right font-medium">
                         <span
                           className={
-                            m.type === "in" ? "text-green-600" : "text-red-600"
+                            m.type === "in" ? "text-success" : "text-destructive"
                           }
                         >
                           {m.type === "in" ? "+" : "-"}

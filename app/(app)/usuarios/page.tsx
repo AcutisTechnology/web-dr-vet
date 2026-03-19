@@ -46,10 +46,10 @@ const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 const ROLE_COLORS: Record<UserRole, string> = {
-  admin: "bg-[#1B2A6B]/10 text-[#1B2A6B]",
-  vet: "bg-[#2DC6C6]/10 text-[#0a8f8f]",
-  attendant: "bg-amber-50 text-amber-700",
-  financial: "bg-emerald-50 text-emerald-700",
+  admin: "bg-primary/10 text-primary",
+  vet: "bg-accent/15 text-primary",
+  attendant: "bg-warning/12 text-[color:var(--warning)]",
+  financial: "bg-success/12 text-success",
 };
 
 const ACCOUNT_LABELS: Record<AccountType, string> = {
@@ -101,7 +101,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
     <div className="space-y-1.5">
       <label className="text-sm font-medium text-gray-700">{label}</label>
       {children}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
@@ -109,7 +109,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 function TextInput({ className = "", ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A6B]/30 focus:border-[#1B2A6B] transition-all ${className}`}
+      className={`w-full px-3.5 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-primary transition-all ${className}`}
       {...props}
     />
   );
@@ -118,7 +118,7 @@ function TextInput({ className = "", ...props }: React.InputHTMLAttributes<HTMLI
 function SelectInput({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A6B]/30 focus:border-[#1B2A6B] transition-all bg-white"
+      className="w-full px-3.5 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-primary transition-all bg-white"
       {...props}
     >
       {children}
@@ -136,7 +136,7 @@ function PermissionsPanel({ permissions, onChange }: {
       <button
         type="button"
         onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center justify-between p-3 rounded-xl bg-[#1B2A6B]/5 border border-[#1B2A6B]/10 text-sm font-semibold text-[#1B2A6B] hover:bg-[#1B2A6B]/8 transition-colors"
+        className="w-full flex items-center justify-between p-3 rounded-xl bg-primary/5 border border-primary/15 text-sm font-semibold text-primary hover:bg-primary/10 transition-colors"
       >
         <span className="flex items-center gap-2"><Settings className="w-4 h-4" />Permissões de acesso</span>
         {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -147,7 +147,7 @@ function PermissionsPanel({ permissions, onChange }: {
             <label key={mod.key} className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors">
               <div className="relative flex items-center mt-0.5">
                 <input type="checkbox" checked={!!permissions[mod.key]} onChange={() => onChange({ ...permissions, [mod.key]: !permissions[mod.key] })} className="sr-only" />
-                <div className={`w-5 h-5 rounded flex items-center justify-center transition-all ${permissions[mod.key] ? "bg-[#1B2A6B] border-[#1B2A6B]" : "bg-white border-2 border-gray-300"}`}>
+                <div className={`w-5 h-5 rounded flex items-center justify-center transition-all ${permissions[mod.key] ? "bg-primary border-primary" : "bg-white border-2 border-gray-300"}`}>
                   {permissions[mod.key] && <CheckCircle2 className="w-3 h-3 text-white" />}
                 </div>
               </div>
@@ -376,8 +376,8 @@ export default function UsuariosPage() {
   if (currentUser?.accountType === "autonomous") {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-[#1B2A6B]/10 flex items-center justify-center">
-          <UserCog className="w-8 h-8 text-[#1B2A6B]" />
+        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+          <UserCog className="w-8 h-8 text-primary" />
         </div>
         <div>
           <p className="font-semibold text-gray-800">Conta Autônoma</p>
@@ -389,12 +389,12 @@ export default function UsuariosPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <UserCog className="w-6 h-6 text-[#1B2A6B]" />
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2 [font-family:var(--font-heading)]">
+            <UserCog className="w-6 h-6 text-primary" />
             Usuários
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -405,7 +405,7 @@ export default function UsuariosPage() {
           <button
             onClick={fetchAll}
             disabled={loading}
-            className="p-2.5 rounded-full border border-gray-200 text-gray-400 hover:text-[#1B2A6B] hover:border-[#1B2A6B]/30 transition-all"
+            className="p-2.5 rounded-full border border-gray-200 text-gray-400 hover:text-primary hover:border-primary/30 transition-all"
             title="Atualizar"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
@@ -413,7 +413,7 @@ export default function UsuariosPage() {
           {isOwner && (
             <button
               onClick={() => { setInviteForm(EMPTY_INVITE); setFormErrors({}); setModal("invite"); }}
-              className="flex items-center gap-2 bg-gradient-to-r from-[#1B2A6B] to-[#2DC6C6] text-white font-semibold px-5 py-2.5 rounded-full hover:shadow-lg hover:scale-105 transition-all duration-200 text-sm"
+              className="flex items-center gap-2 bg-gradient-to-r from-primary to-accent text-white font-semibold px-5 py-2.5 rounded-full hover:shadow-lg hover:scale-105 transition-all duration-200 text-sm"
             >
               <Plus className="w-4 h-4" /> Convidar usuário
             </button>
@@ -430,7 +430,7 @@ export default function UsuariosPage() {
 
       {/* Non-owner notice */}
       {!isOwner && (
-        <div className="flex items-center gap-3 bg-[#1B2A6B]/5 border border-[#1B2A6B]/20 rounded-xl px-4 py-3 text-sm text-[#1B2A6B]">
+        <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl px-4 py-3 text-sm text-primary">
           <ShieldCheck className="w-4 h-4 shrink-0" />
           Apenas o administrador da clínica pode adicionar ou editar usuários.
         </div>
@@ -444,7 +444,7 @@ export default function UsuariosPage() {
           placeholder="Buscar por nome ou e-mail..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A6B]/30 focus:border-[#1B2A6B] transition-all"
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-primary transition-all"
         />
       </div>
 
@@ -458,7 +458,7 @@ export default function UsuariosPage() {
 
       {/* Error */}
       {!loading && error && (
-        <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-4 text-sm text-red-700">
+        <div className="flex items-center gap-3 bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-4 text-sm text-destructive">
           <AlertCircle className="w-5 h-5 shrink-0" />
           <div className="flex-1">{error}</div>
           <button onClick={fetchAll} className="font-semibold underline">Tentar novamente</button>
@@ -473,14 +473,14 @@ export default function UsuariosPage() {
           </h2>
           <div className="grid gap-2">
             {filteredInvites.map(invite => (
-              <div key={invite.token} className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-center gap-4">
-                <div className="w-11 h-11 rounded-full bg-amber-200 flex items-center justify-center text-amber-700 text-sm font-bold shrink-0">
+              <div key={invite.token} className="bg-warning/10 border border-warning/20 rounded-2xl px-5 py-4 flex items-center gap-4">
+                <div className="w-11 h-11 rounded-full bg-warning/20 flex items-center justify-center text-[color:var(--warning)] text-sm font-bold shrink-0">
                   {invite.name?.[0]?.toUpperCase() ?? "?"}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-semibold text-gray-900">{invite.name}</p>
-                    <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium flex items-center gap-1">
+                    <span className="text-[10px] bg-warning/15 text-[color:var(--warning)] px-1.5 py-0.5 rounded-full font-medium flex items-center gap-1">
                       <Clock className="w-2.5 h-2.5" />Convite pendente
                     </span>
                   </div>
@@ -493,7 +493,7 @@ export default function UsuariosPage() {
                   <button
                     onClick={() => handleResend(invite)}
                     disabled={busy}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 hover:text-amber-900 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 text-xs font-semibold text-[color:var(--warning)] hover:text-[color:var(--warning)]/90 px-3 py-1.5 rounded-lg hover:bg-warning/15 transition-colors disabled:opacity-50"
                     title="Reenviar convite"
                   >
                     {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
@@ -520,7 +520,7 @@ export default function UsuariosPage() {
               <UserCog className="w-10 h-10 mx-auto mb-3 opacity-40" />
               <p className="text-sm">Nenhum usuário encontrado.</p>
               {isOwner && (
-                <button onClick={() => { setInviteForm(EMPTY_INVITE); setModal("invite"); }} className="mt-4 text-sm text-[#1B2A6B] font-medium hover:underline">
+                <button onClick={() => { setInviteForm(EMPTY_INVITE); setModal("invite"); }} className="mt-4 text-sm text-primary font-medium hover:underline">
                   + Convidar o primeiro usuário
                 </button>
               )}
@@ -536,7 +536,7 @@ export default function UsuariosPage() {
                   key={u.id}
                   className={`bg-white rounded-2xl border px-5 py-4 flex items-center gap-4 transition-all ${u.active ? "border-gray-100 shadow-sm" : "border-gray-200 opacity-60"}`}
                 >
-                  <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 ${u.active ? "bg-gradient-to-br from-[#1B2A6B] to-[#2DC6C6]" : "bg-gray-300"}`}>
+                  <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 ${u.active ? "bg-gradient-to-br from-primary to-accent" : "bg-gray-300"}`}>
                     {u.name?.[0]?.toUpperCase() ?? "?"}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -544,11 +544,11 @@ export default function UsuariosPage() {
                       <p className="text-sm font-semibold text-gray-900 truncate">
                         {u.name}
                         {isSelf && (
-                          <span className="ml-1.5 text-[10px] bg-[#2DC6C6]/15 text-[#0a8f8f] px-1.5 py-0.5 rounded-full font-medium">você</span>
+                          <span className="ml-1.5 text-[10px] bg-accent/20 text-primary px-1.5 py-0.5 rounded-full font-medium">você</span>
                         )}
                       </p>
                       {!u.active && (
-                        <span className="text-[10px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded-full font-medium">Inativo</span>
+                        <span className="text-[10px] bg-destructive/10 text-destructive px-1.5 py-0.5 rounded-full font-medium">Inativo</span>
                       )}
                     </div>
                     <p className="text-xs text-gray-400 truncate mt-0.5">{u.email}</p>
@@ -561,7 +561,7 @@ export default function UsuariosPage() {
                         {ACCOUNT_LABELS[u.accountType] ?? u.accountType}
                       </span>
                       {u.permissions && (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-[#1B2A6B] bg-[#1B2A6B]/5 px-1.5 py-0.5 rounded-full">
+                        <span className="inline-flex items-center gap-1 text-[10px] text-primary bg-primary/5 px-1.5 py-0.5 rounded-full">
                           <Shield className="w-2.5 h-2.5" />
                           {Object.values(u.permissions).filter(Boolean).length} módulos
                         </span>
@@ -570,21 +570,21 @@ export default function UsuariosPage() {
                   </div>
                   {isOwner && !isSelf && (
                     <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => openPermissions(u)} className="p-2 rounded-lg text-gray-400 hover:text-[#1B2A6B] hover:bg-[#1B2A6B]/5 transition-colors" title="Permissões">
+                      <button onClick={() => openPermissions(u)} className="p-2 rounded-lg text-gray-400 hover:text-primary hover:bg-primary/5 transition-colors" title="Permissões">
                         <Settings className="w-4 h-4" />
                       </button>
-                      <button onClick={() => openEdit(u)} className="p-2 rounded-lg text-gray-400 hover:text-[#1B2A6B] hover:bg-[#1B2A6B]/5 transition-colors" title="Editar">
+                      <button onClick={() => openEdit(u)} className="p-2 rounded-lg text-gray-400 hover:text-primary hover:bg-primary/5 transition-colors" title="Editar">
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleToggleActive(u)}
                         disabled={busy}
-                        className={`p-2 rounded-lg transition-colors ${u.active ? "text-gray-400 hover:text-amber-600 hover:bg-amber-50" : "text-gray-400 hover:text-emerald-600 hover:bg-emerald-50"}`}
+                        className={`p-2 rounded-lg transition-colors ${u.active ? "text-gray-400 hover:text-[color:var(--warning)] hover:bg-warning/10" : "text-gray-400 hover:text-success hover:bg-success/10"}`}
                         title={u.active ? "Desativar" : "Reativar"}
                       >
                         {u.active ? <Ban className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
                       </button>
-                      <button onClick={() => { setSelectedUser(u); setModal("delete"); }} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Remover">
+                      <button onClick={() => { setSelectedUser(u); setModal("delete"); }} className="p-2 rounded-lg text-gray-400 hover:text-destructive hover:bg-destructive/10 transition-colors" title="Remover">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -607,9 +607,9 @@ export default function UsuariosPage() {
       {modal === "invite" && (
         <Modal title="Convidar usuário" onClose={closeModal} wide>
           <div className="space-y-4">
-            <div className="flex items-start gap-3 bg-blue-50 rounded-xl p-3 border border-blue-100">
-              <Mail className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
-              <p className="text-xs text-blue-700">
+            <div className="flex items-start gap-3 bg-info/10 rounded-xl p-3 border border-info/20">
+              <Mail className="w-4 h-4 text-info mt-0.5 shrink-0" />
+              <p className="text-xs text-info">
                 Um e-mail será enviado com um link para o usuário criar a própria senha e acessar o sistema.
               </p>
             </div>
@@ -647,7 +647,7 @@ export default function UsuariosPage() {
               <button
                 onClick={handleSendInvite}
                 disabled={busy}
-                className="flex items-center gap-2 px-5 py-2 rounded-full text-sm font-semibold bg-gradient-to-r from-[#1B2A6B] to-[#2DC6C6] text-white hover:shadow-md hover:scale-105 transition-all disabled:opacity-60 disabled:scale-100"
+                className="flex items-center gap-2 px-5 py-2 rounded-full text-sm font-semibold bg-gradient-to-r from-primary to-accent text-white hover:shadow-md hover:scale-105 transition-all disabled:opacity-60 disabled:scale-100"
               >
                 {busy ? <><Loader2 className="w-4 h-4 animate-spin" />Enviando...</> : <><Send className="w-4 h-4" />Enviar convite</>}
               </button>
@@ -682,7 +682,7 @@ export default function UsuariosPage() {
             />
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={closeModal} className="px-5 py-2 rounded-full text-sm font-medium text-gray-500 hover:bg-gray-100 transition-colors">Cancelar</button>
-              <button onClick={handleEdit} disabled={busy} className="px-5 py-2 rounded-full text-sm font-semibold bg-gradient-to-r from-[#1B2A6B] to-[#2DC6C6] text-white hover:shadow-md hover:scale-105 transition-all disabled:opacity-60">
+              <button onClick={handleEdit} disabled={busy} className="px-5 py-2 rounded-full text-sm font-semibold bg-gradient-to-r from-primary to-accent text-white hover:shadow-md hover:scale-105 transition-all disabled:opacity-60">
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvar alterações"}
               </button>
             </div>
@@ -694,8 +694,8 @@ export default function UsuariosPage() {
       {modal === "permissions" && selectedUser && (
         <Modal title={`Permissões: ${selectedUser.name}`} onClose={closeModal} wide>
           <div className="space-y-4">
-            <div className="flex items-center gap-3 bg-[#1B2A6B]/5 rounded-xl p-3 border border-[#1B2A6B]/10">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#1B2A6B] to-[#2DC6C6] flex items-center justify-center text-white text-sm font-bold shrink-0">
+            <div className="flex items-center gap-3 bg-primary/5 rounded-xl p-3 border border-primary/10">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-sm font-bold shrink-0">
                 {selectedUser.name?.[0]?.toUpperCase()}
               </div>
               <div>
@@ -708,7 +708,7 @@ export default function UsuariosPage() {
                 <label key={mod.key} className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors">
                   <div className="relative flex items-center mt-0.5">
                     <input type="checkbox" checked={!!permForm[mod.key]} onChange={() => setPermForm(p => ({ ...p, [mod.key]: !p[mod.key] }))} className="sr-only" />
-                    <div className={`w-5 h-5 rounded flex items-center justify-center transition-all border-2 ${permForm[mod.key] ? "bg-[#1B2A6B] border-[#1B2A6B]" : "bg-white border-gray-300"}`}>
+                    <div className={`w-5 h-5 rounded flex items-center justify-center transition-all border-2 ${permForm[mod.key] ? "bg-primary border-primary" : "bg-white border-gray-300"}`}>
                       {permForm[mod.key] && <CheckCircle2 className="w-3 h-3 text-white" />}
                     </div>
                   </div>
@@ -721,7 +721,7 @@ export default function UsuariosPage() {
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={closeModal} className="px-5 py-2 rounded-full text-sm font-medium text-gray-500 hover:bg-gray-100 transition-colors">Cancelar</button>
-              <button onClick={handleSavePermissions} disabled={busy} className="px-5 py-2 rounded-full text-sm font-semibold bg-gradient-to-r from-[#1B2A6B] to-[#2DC6C6] text-white hover:shadow-md hover:scale-105 transition-all disabled:opacity-60">
+              <button onClick={handleSavePermissions} disabled={busy} className="px-5 py-2 rounded-full text-sm font-semibold bg-gradient-to-r from-primary to-accent text-white hover:shadow-md hover:scale-105 transition-all disabled:opacity-60">
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvar permissões"}
               </button>
             </div>
@@ -733,8 +733,8 @@ export default function UsuariosPage() {
       {modal === "delete" && selectedUser && (
         <Modal title="Remover usuário" onClose={closeModal}>
           <div className="space-y-4">
-            <div className="flex items-center gap-3 bg-red-50 rounded-xl p-4">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#1B2A6B] to-[#2DC6C6] flex items-center justify-center text-white text-sm font-bold shrink-0">
+            <div className="flex items-center gap-3 bg-destructive/10 rounded-xl p-4">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-sm font-bold shrink-0">
                 {selectedUser.name?.[0]?.toUpperCase()}
               </div>
               <div>
@@ -745,7 +745,7 @@ export default function UsuariosPage() {
             <p className="text-sm text-gray-600">O usuário será removido e não poderá mais acessar o sistema.</p>
             <div className="flex justify-end gap-3 pt-1">
               <button onClick={closeModal} className="px-5 py-2 rounded-full text-sm font-medium text-gray-500 hover:bg-gray-100 transition-colors">Cancelar</button>
-              <button onClick={handleDelete} disabled={busy} className="flex items-center gap-2 px-5 py-2 rounded-full text-sm font-semibold bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-60">
+              <button onClick={handleDelete} disabled={busy} className="flex items-center gap-2 px-5 py-2 rounded-full text-sm font-semibold bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-60">
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Trash2 className="w-4 h-4" />Remover</>}
               </button>
             </div>

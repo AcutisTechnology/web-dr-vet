@@ -18,15 +18,15 @@ export default function SubscriptionSuccessPage() {
   }, [router]);
 
   return (
-    <div className="flex items-center justify-center min-h-[80vh]">
+    <div className="flex items-center justify-center min-h-[80vh] font-sans">
       <Card className="max-w-md w-full">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="rounded-full bg-green-100 p-3">
-              <CheckCircle2 className="w-12 h-12 text-green-600" />
+            <div className="rounded-full bg-success/12 p-3">
+              <CheckCircle2 className="w-12 h-12 text-success" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Pagamento Confirmado!</CardTitle>
+          <CardTitle className="text-2xl [font-family:var(--font-heading)]">Pagamento Confirmado!</CardTitle>
           <CardDescription>
             Sua assinatura foi ativada com sucesso
           </CardDescription>

@@ -447,10 +447,10 @@ export default function PDVPage() {
     );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 font-sans">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">PDV / Vendas</h1>
+          <h1 className="text-2xl font-bold text-primary [font-family:var(--font-heading)]">PDV / Vendas</h1>
           <p className="text-muted-foreground text-sm">
             Ponto de venda e cadastro de produtos/serviços
           </p>
@@ -526,7 +526,7 @@ export default function PDVPage() {
                         <span
                           className={
                             p.stock <= p.min_stock
-                              ? "text-red-500 font-semibold"
+                              ? "text-destructive font-semibold"
                               : ""
                           }
                         >
@@ -891,7 +891,7 @@ export default function PDVPage() {
                     {cart.payments.map((p, i) => (
                       <div
                         key={i}
-                        className="flex items-center justify-between text-sm bg-green-50 rounded px-3 py-1.5"
+                        className="flex items-center justify-between text-sm bg-success/10 rounded px-3 py-1.5"
                       >
                         <span>
                           {
@@ -918,12 +918,12 @@ export default function PDVPage() {
                     <div className="flex justify-between text-sm font-medium px-1">
                       <span>Restante</span>
                       <span
-                        className={
-                          cart.remaining() > 0
-                            ? "text-destructive"
-                            : "text-green-600"
-                        }
-                      >
+                          className={
+                            cart.remaining() > 0
+                              ? "text-destructive"
+                              : "text-success"
+                          }
+                        >
                         {formatCurrency(cart.remaining())}
                       </span>
                     </div>

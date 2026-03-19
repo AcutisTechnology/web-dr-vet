@@ -457,10 +457,10 @@ export default function InternacaoPage() {
     );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 font-sans">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Internação</h1>
+          <h1 className="text-2xl font-bold text-primary [font-family:var(--font-heading)]">Internação</h1>
           <p className="text-muted-foreground text-sm">
             {active.length} animais internados
           </p>
@@ -473,7 +473,7 @@ export default function InternacaoPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Internados", value: active.length, color: "text-blue-600" },
+          { label: "Internados", value: active.length, color: "text-info" },
           {
             label: "Alta hoje",
             value: others.filter((h) =>
@@ -481,19 +481,19 @@ export default function InternacaoPage() {
                 new Date().toISOString().split("T")[0],
               ),
             ).length,
-            color: "text-green-600",
+            color: "text-success",
           },
           {
             label: "Boxes livres",
             value: boxes.filter(
               (b) => b.active && !active.find((h) => h.box_id === b.id),
             ).length,
-            color: "text-purple-600",
+            color: "text-primary",
           },
           {
             label: "Total histórico",
             value: hospitalizations.length,
-            color: "text-gray-600",
+            color: "text-muted-foreground",
           },
         ].map((s) => (
           <Card key={s.label}>
@@ -762,11 +762,11 @@ export default function InternacaoPage() {
                           return (
                             <div
                               key={p.id}
-                              className="rounded-lg border border-blue-200 overflow-hidden"
+                              className="rounded-lg border border-info/25 overflow-hidden"
                             >
                               {/* Header */}
-                              <div className="flex items-start gap-3 p-3 bg-blue-50">
-                                <Syringe className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                              <div className="flex items-start gap-3 p-3 bg-info/10">
+                                <Syringe className="w-4 h-4 text-info mt-0.5 shrink-0" />
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-start justify-between gap-2">
                                     <div>
@@ -790,10 +790,10 @@ export default function InternacaoPage() {
                                         <span
                                           className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                                             doneCount === totalDoses
-                                              ? "bg-green-100 text-green-700"
-                                              : "bg-amber-100 text-amber-700"
-                                          }`}
-                                        >
+                                              ? "bg-success/12 text-success"
+                                              : "bg-warning/12 text-[color:var(--warning)]"
+                                           }`}
+                                         >
                                           {doneCount}/{totalDoses}
                                         </span>
                                       )}
@@ -841,11 +841,11 @@ export default function InternacaoPage() {
                                         key={dose.id}
                                         className={`flex items-center gap-3 px-4 py-2.5 ${
                                           isDone
-                                            ? "bg-green-50"
+                                            ? "bg-success/10"
                                             : isLate
-                                              ? "bg-red-50"
+                                              ? "bg-destructive/10"
                                               : isFuture
-                                                ? "bg-blue-50/30"
+                                                ? "bg-info/8"
                                                 : "bg-white"
                                         }`}
                                       >
@@ -876,7 +876,7 @@ export default function InternacaoPage() {
                                           className="shrink-0 disabled:opacity-60"
                                         >
                                           {isDone ? (
-                                            <CheckSquare className="w-5 h-5 text-green-600" />
+                                            <CheckSquare className="w-5 h-5 text-success" />
                                           ) : (
                                             <Square className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
                                           )}
@@ -902,13 +902,13 @@ export default function InternacaoPage() {
                                               )}
                                             </span>
                                             {isLate && (
-                                              <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-medium">
+                                              <span className="text-xs bg-destructive/12 text-destructive px-1.5 py-0.5 rounded-full font-medium">
                                                 Atrasada
                                               </span>
                                             )}
                                           </div>
                                           {isDone && dose.administeredAt && (
-                                            <p className="text-xs text-green-700 mt-0.5">
+                                            <p className="text-xs text-success mt-0.5">
                                               <CheckCheck className="w-3 h-3 inline mr-1" />
                                               Administrado{" "}
                                               {dose.administeredAt.toLocaleTimeString(
@@ -964,7 +964,7 @@ export default function InternacaoPage() {
               return (
                 <Card
                   key={b.id}
-                  className={`relative ${occupant ? "border-blue-300 bg-blue-50" : "border-green-300 bg-green-50"}`}
+                  className={`relative ${occupant ? "border-info/35 bg-info/10" : "border-success/35 bg-success/10"}`}
                 >
                   <CardContent className="p-3">
                     <div className="flex items-start justify-between">
@@ -981,11 +981,11 @@ export default function InternacaoPage() {
                           </p>
                         )}
                         {occupant ? (
-                          <p className="text-xs text-blue-700 font-medium mt-1">
+                          <p className="text-xs text-info font-medium mt-1">
                             {occupant.pet?.name ?? "Ocupado"}
                           </p>
                         ) : (
-                          <p className="text-xs text-green-700 font-medium mt-1">
+                          <p className="text-xs text-success font-medium mt-1">
                             Livre
                           </p>
                         )}
@@ -1229,7 +1229,7 @@ export default function InternacaoPage() {
               />
             </div>
             {prescForm.frequency && prescForm.daysAhead && (
-              <p className="text-xs text-muted-foreground bg-blue-50 border border-blue-100 rounded px-3 py-2">
+              <p className="text-xs text-muted-foreground bg-info/8 border border-info/20 rounded px-3 py-2">
                 Serão agendadas{" "}
                 <strong>
                   {Math.ceil(
@@ -1265,13 +1265,13 @@ export default function InternacaoPage() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CheckSquare className="w-5 h-5 text-green-600" />
+              <CheckSquare className="w-5 h-5 text-success" />
               Confirmar Administração
             </DialogTitle>
           </DialogHeader>
           {confirmingDose && (
             <div className="space-y-4 py-2">
-              <div className="rounded-lg bg-blue-50 border border-blue-100 p-3 space-y-1">
+              <div className="rounded-lg bg-info/8 border border-info/20 p-3 space-y-1">
                 <p className="text-sm font-semibold">
                   {confirmingDose.presc.medication}
                 </p>

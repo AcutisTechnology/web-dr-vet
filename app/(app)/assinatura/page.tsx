@@ -60,11 +60,11 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
-  trial:    "bg-blue-100 text-blue-800 border-0",
-  active:   "bg-green-100 text-green-800 border-0",
-  past_due: "bg-yellow-100 text-yellow-800 border-0",
-  canceled: "bg-gray-100 text-gray-700 border-0",
-  expired:  "bg-red-100 text-red-800 border-0",
+  trial:    "bg-info/12 text-info border-0",
+  active:   "bg-success/12 text-success border-0",
+  past_due: "bg-warning/12 text-[color:var(--warning)] border-0",
+  canceled: "bg-muted text-muted-foreground border-0",
+  expired:  "bg-destructive/12 text-destructive border-0",
 };
 
 // ── Trial progress card ───────────────────────────────────────────────────────
@@ -72,26 +72,26 @@ function TrialProgressCard({ trialEndsAt }: { trialEndsAt: string }) {
   const { daysLeft, hoursLeft, progressPct, isExpired } = calcTrialProgress(trialEndsAt);
 
   const barColor = isExpired
-    ? "bg-red-500"
+    ? "bg-destructive"
     : daysLeft <= 1
-    ? "bg-amber-400"
+    ? "bg-warning"
     : daysLeft <= 3
-    ? "bg-yellow-400"
-    : "bg-[#2DC6C6]";
+    ? "bg-warning"
+    : "bg-accent";
 
   const cardClass = isExpired
-    ? "border-red-200 bg-red-50/40"
+    ? "border-destructive/25 bg-destructive/8"
     : daysLeft <= 3
-    ? "border-amber-200 bg-amber-50/40"
-    : "border-blue-200 bg-blue-50/40";
+    ? "border-warning/25 bg-warning/8"
+    : "border-info/25 bg-info/8";
 
   const countdownColor = isExpired
-    ? "text-red-700"
+    ? "text-destructive"
     : daysLeft <= 1
-    ? "text-amber-700"
+    ? "text-[color:var(--warning)]"
     : daysLeft <= 3
-    ? "text-yellow-700"
-    : "text-[#1B2A6B]";
+    ? "text-[color:var(--warning)]"
+    : "text-primary";
 
   return (
     <Card className={cardClass}>
@@ -100,8 +100,8 @@ function TrialProgressCard({ trialEndsAt }: { trialEndsAt: string }) {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
             {isExpired
-              ? <XCircle className="w-5 h-5 text-red-500 shrink-0" />
-              : <Sparkles className="w-5 h-5 text-blue-500 shrink-0" />}
+              ? <XCircle className="w-5 h-5 text-destructive shrink-0" />
+              : <Sparkles className="w-5 h-5 text-info shrink-0" />}
             <span className="font-semibold text-sm">
               {isExpired ? "Período de teste encerrado" : "Período de teste gratuito"}
             </span>
@@ -125,7 +125,7 @@ function TrialProgressCard({ trialEndsAt }: { trialEndsAt: string }) {
           </div>
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>Início do teste (7 dias)</span>
-            <span className={isExpired ? "text-red-600 font-medium" : ""}>
+            <span className={isExpired ? "text-destructive font-medium" : ""}>
               {isExpired ? "Expirou em " : "Expira em "}
               {formatDate(trialEndsAt)}
             </span>
@@ -134,7 +134,7 @@ function TrialProgressCard({ trialEndsAt }: { trialEndsAt: string }) {
 
         {/* Urgency notice */}
         {!isExpired && daysLeft <= 3 && (
-          <p className="text-xs text-amber-700 bg-amber-100 rounded-lg px-3 py-2">
+          <p className="text-xs text-[color:var(--warning)] bg-warning/15 rounded-lg px-3 py-2">
             ⚠️{" "}
             {daysLeft === 0
               ? `Apenas ${hoursLeft} hora${hoursLeft !== 1 ? "s" : ""} restante${hoursLeft !== 1 ? "s" : ""}! Adicione um pagamento para não perder o acesso.`
@@ -143,7 +143,7 @@ function TrialProgressCard({ trialEndsAt }: { trialEndsAt: string }) {
         )}
 
         {isExpired && (
-          <p className="text-xs text-red-700 bg-red-100 rounded-lg px-3 py-2">
+          <p className="text-xs text-destructive bg-destructive/12 rounded-lg px-3 py-2">
             Seu período de teste encerrou. Adicione um pagamento para voltar a usar a plataforma.
           </p>
         )}
@@ -256,10 +256,10 @@ export default function SubscriptionPage() {
   const hasPending     = subscription.transactions?.some((t) => t.status === "pending");
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
+    <div className="max-w-2xl mx-auto space-y-5 font-sans">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-[#1B2A6B]">Assinatura</h1>
+        <h1 className="text-2xl font-bold text-primary [font-family:var(--font-heading)]">Assinatura</h1>
         <p className="text-muted-foreground text-sm mt-1">Gerencie seu plano e pagamentos</p>
       </div>
 
@@ -272,10 +272,10 @@ export default function SubscriptionPage() {
 
       {/* Active subscription banner */}
       {subscription.status === "active" && (
-        <Alert className="border-green-200 bg-green-50">
-          <ShieldCheck className="h-4 w-4 text-green-600" />
-          <AlertTitle className="text-green-900">Assinatura Ativa</AlertTitle>
-          <AlertDescription className="text-green-800">
+        <Alert className="border-success/30 bg-success/10">
+          <ShieldCheck className="h-4 w-4 text-success" />
+          <AlertTitle className="text-success">Assinatura Ativa</AlertTitle>
+          <AlertDescription className="text-success">
             Seu plano está ativo e todos os recursos estão disponíveis.
             {subscription.current_period_end && (
               <> Próxima cobrança em <strong>{formatDate(subscription.current_period_end)}</strong>.</>
@@ -324,7 +324,7 @@ export default function SubscriptionPage() {
                 <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
                   {isTrialExpired ? "Trial encerrou em" : "Trial termina em"}
                 </p>
-                <p className={`font-semibold ${isTrialExpired ? "text-red-600" : "text-blue-700"}`}>
+                <p className={`font-semibold ${isTrialExpired ? "text-destructive" : "text-info"}`}>
                   {formatDate(subscription.trial_ends_at)}
                 </p>
               </div>
@@ -348,7 +348,7 @@ export default function SubscriptionPage() {
               <Button
                 onClick={() => reactivateMutation.mutate()}
                 disabled={reactivateMutation.isPending}
-                className="bg-[#1B2A6B] hover:bg-[#1B2A6B]/90"
+                className="bg-primary hover:bg-primary/90"
               >
                 {reactivateMutation.isPending
                   ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Reativando...</>
@@ -360,7 +360,7 @@ export default function SubscriptionPage() {
               <Button
                 onClick={() => createPaymentMutation.mutate()}
                 disabled={createPaymentMutation.isPending}
-                className="bg-gradient-to-r from-[#1B2A6B] to-[#2DC6C6] hover:opacity-90"
+                className="bg-gradient-to-r from-primary to-accent hover:opacity-90"
               >
                 {createPaymentMutation.isPending
                   ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processando...</>
@@ -401,9 +401,9 @@ export default function SubscriptionPage() {
       </Card>
 
       {/* Features included */}
-      <Card className="bg-gradient-to-br from-[#1B2A6B]/3 to-[#2DC6C6]/5 border-[#2DC6C6]/20">
+      <Card className="bg-gradient-to-br from-primary/5 to-accent/10 border-accent/20">
         <CardContent className="pt-5">
-          <p className="text-sm font-semibold text-[#1B2A6B] mb-3">Tudo incluído no Plano Mensal</p>
+          <p className="text-sm font-semibold text-primary mb-3">Tudo incluído no Plano Mensal</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {[
               "Clientes e Pets ilimitados",
@@ -415,8 +415,8 @@ export default function SubscriptionPage() {
               "Internação",
               "Usuários da equipe",
             ].map((f) => (
-              <div key={f} className="flex items-center gap-2 text-sm text-gray-700">
-                <CheckCircle2 className="w-3.5 h-3.5 text-[#2DC6C6] shrink-0" />
+              <div key={f} className="flex items-center gap-2 text-sm text-foreground">
+                <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0" />
                 {f}
               </div>
             ))}
@@ -437,10 +437,10 @@ export default function SubscriptionPage() {
                 <div key={t.id} className="flex items-center justify-between p-3 border rounded-xl">
                   <div className="flex items-center gap-3">
                     {t.status === "paid"
-                      ? <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+                      ? <CheckCircle2 className="w-5 h-5 text-success shrink-0" />
                       : t.status === "pending"
-                      ? <Clock className="w-5 h-5 text-amber-500 shrink-0" />
-                      : <XCircle className="w-5 h-5 text-red-500 shrink-0" />}
+                      ? <Clock className="w-5 h-5 text-[color:var(--warning)] shrink-0" />
+                      : <XCircle className="w-5 h-5 text-destructive shrink-0" />}
                     <div>
                       <p className="text-sm font-medium">R$ {(t.amount / 100).toFixed(2)}</p>
                       <p className="text-xs text-muted-foreground">
@@ -448,9 +448,9 @@ export default function SubscriptionPage() {
                         {t.payment_method && ` · ${t.payment_method.toUpperCase()}`}
                         {" · "}
                         <span className={
-                          t.status === "paid"    ? "text-green-600 font-medium" :
-                          t.status === "pending" ? "text-amber-600 font-medium" :
-                          "text-red-600 font-medium"
+                          t.status === "paid"    ? "text-success font-medium" :
+                          t.status === "pending" ? "text-[color:var(--warning)] font-medium" :
+                          "text-destructive font-medium"
                         }>
                           {t.status === "paid" ? "Pago" : t.status === "pending" ? "Pendente" : "Cancelado"}
                         </span>

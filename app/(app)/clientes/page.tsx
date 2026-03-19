@@ -157,10 +157,10 @@ export default function ClientesPage() {
   const isSaving = createClient.isPending || updateClient.isPending;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 font-sans">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Clientes & Pets</h1>
+          <h1 className="text-2xl font-bold text-primary [font-family:var(--font-heading)]">Clientes & Pets</h1>
           <p className="text-muted-foreground text-sm">
             {clients.filter((c) => c.active).length} clientes ativos
           </p>
@@ -196,7 +196,7 @@ export default function ClientesPage() {
           {filtered.map((client) => (
             <Card
               key={client.id}
-              className={!client.active ? "opacity-60" : ""}
+              className={!client.active ? "opacity-60" : "border-border/80 hover:border-primary/20 transition-colors"}
             >
               <CardContent className="p-4">
                 <div className="flex items-center justify-between gap-4">

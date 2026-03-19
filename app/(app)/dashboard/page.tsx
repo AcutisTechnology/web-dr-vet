@@ -31,13 +31,13 @@ import {
 } from "recharts";
 
 const PIE_COLORS = [
-  "#1B2A6B",
-  "#2DC6C6",
-  "#f59e0b",
-  "#4f8ef7",
-  "#ef4444",
-  "#10b981",
-  "#8b5cf6",
+  "var(--primary)",
+  "var(--accent)",
+  "var(--warning)",
+  "var(--info)",
+  "var(--destructive)",
+  "var(--success)",
+  "var(--secondary-foreground)",
 ];
 
 const statusColors: Record<
@@ -117,10 +117,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <h1 className="text-2xl font-bold [font-family:var(--font-heading)]">Dashboard</h1>
           <p className="text-muted-foreground text-sm">Visão geral do dia</p>
         </div>
         <Button
@@ -144,21 +144,21 @@ export default function DashboardPage() {
           }
           sub={`${stats?.today_appointments.completed ?? 0} concluídos`}
           icon={Calendar}
-          color="bg-[#1B2A6B]"
+          color="bg-primary"
         />
         <KpiCard
           title="Vendas do Dia"
           value={formatCurrency(stats?.today_sales.revenue ?? 0)}
           sub={`${stats?.today_sales.total ?? 0} transações`}
           icon={ShoppingCart}
-          color="bg-green-500"
+          color="bg-success"
         />
         <KpiCard
           title="Internações Ativas"
           value={stats?.active_hospitalizations.total ?? 0}
           sub="animais internados"
           icon={BedDouble}
-          color="bg-[#2DC6C6]"
+          color="bg-accent"
         />
         <KpiCard
           title="Estoque Baixo"
@@ -167,8 +167,8 @@ export default function DashboardPage() {
           icon={AlertTriangle}
           color={
             (stats?.low_stock_products.total ?? 0) > 0
-              ? "bg-red-500"
-              : "bg-gray-400"
+              ? "bg-destructive"
+              : "bg-muted-foreground"
           }
         />
       </div>
@@ -184,11 +184,11 @@ export default function DashboardPage() {
               <AreaChart data={weeklySalesChart}>
                 <defs>
                   <linearGradient id="colorVendas" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#1B2A6B" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#1B2A6B" stopOpacity={0} />
+                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="day" tick={{ fontSize: 12 }} />
                 <YAxis
                   tick={{ fontSize: 12 }}
@@ -198,7 +198,7 @@ export default function DashboardPage() {
                 <Area
                   type="monotone"
                   dataKey="vendas"
-                  stroke="#1B2A6B"
+                  stroke="var(--primary)"
                   fill="url(#colorVendas)"
                   strokeWidth={2}
                   name="Vendas"
@@ -287,7 +287,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-500" /> Alertas de
+              <AlertTriangle className="w-4 h-4 text-warning" /> Alertas de
               Estoque
             </CardTitle>
           </CardHeader>
@@ -328,13 +328,13 @@ export default function DashboardPage() {
         <CardContent>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={weeklyApptsChart}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="day" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} />
               <Tooltip />
               <Bar
                 dataKey="atendimentos"
-                fill="#2DC6C6"
+                fill="var(--accent)"
                 radius={[4, 4, 0, 0]}
                 name="Atendimentos"
               />

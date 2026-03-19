@@ -235,10 +235,10 @@ export default function FinanceiroPage() {
     .reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
   const chartData = [
-    { name: "Recebido", value: totalIncome, fill: "#22c55e" },
-    { name: "Pago", value: totalExpense, fill: "#ef4444" },
-    { name: "A Receber", value: pendingIncome, fill: "#86efac" },
-    { name: "A Pagar", value: pendingExpense, fill: "#fca5a5" },
+    { name: "Recebido", value: totalIncome, fill: "var(--success)" },
+    { name: "Pago", value: totalExpense, fill: "var(--destructive)" },
+    { name: "A Receber", value: pendingIncome, fill: "var(--accent)" },
+    { name: "A Pagar", value: pendingExpense, fill: "var(--warning)" },
   ];
 
   const EMPTY_FORM = {
@@ -329,10 +329,10 @@ export default function FinanceiroPage() {
     );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 font-sans">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-2xl font-bold">Financeiro</h1>
+          <h1 className="text-2xl font-bold text-primary [font-family:var(--font-heading)]">Financeiro</h1>
           <p className="text-muted-foreground text-sm">
             Controle de receitas e despesas
           </p>
@@ -354,29 +354,29 @@ export default function FinanceiroPage() {
             label: "Receitas Recebidas",
             value: totalIncome,
             icon: TrendingUp,
-            color: "text-green-600",
-            bg: "bg-green-50",
+            color: "text-success",
+            bg: "bg-success/10",
           },
           {
             label: "Despesas Pagas",
             value: totalExpense,
             icon: TrendingDown,
-            color: "text-red-600",
-            bg: "bg-red-50",
+            color: "text-destructive",
+            bg: "bg-destructive/10",
           },
           {
             label: "A Receber",
             value: pendingIncome,
             icon: DollarSign,
-            color: "text-blue-600",
-            bg: "bg-blue-50",
+            color: "text-info",
+            bg: "bg-info/10",
           },
           {
             label: "A Pagar",
             value: pendingExpense,
             icon: DollarSign,
-            color: "text-orange-600",
-            bg: "bg-orange-50",
+            color: "text-[color:var(--warning)]",
+            bg: "bg-warning/10",
           },
         ].map((k) => (
           <Card key={k.label}>
@@ -435,7 +435,7 @@ export default function FinanceiroPage() {
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground">{acc.name}</p>
               <p
-                className={`text-xl font-bold ${acc.balance >= 0 ? "text-green-600" : "text-red-600"}`}
+                className={`text-xl font-bold ${acc.balance >= 0 ? "text-success" : "text-destructive"}`}
               >
                 {formatCurrency(acc.balance)}
               </p>
@@ -524,7 +524,7 @@ export default function FinanceiroPage() {
                     </Badge>
                   </TableCell>
                   <TableCell
-                    className={`text-right font-bold ${entry.type === "income" ? "text-green-600" : "text-red-600"}`}
+                    className={`text-right font-bold ${entry.type === "income" ? "text-success" : "text-destructive"}`}
                   >
                     {entry.type === "expense" ? "-" : ""}
                     {formatCurrency(Number(entry.amount) || 0)}

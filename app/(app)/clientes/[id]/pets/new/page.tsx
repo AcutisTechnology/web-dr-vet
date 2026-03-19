@@ -238,7 +238,7 @@ export default function NewPetPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 font-sans">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <Link href={`/clientes/${clientId}`}>
@@ -247,7 +247,7 @@ export default function NewPetPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-xl font-bold">Novo Pet</h1>
+            <h1 className="text-xl font-bold [font-family:var(--font-heading)]">Novo Pet</h1>
             <p className="text-sm text-muted-foreground">
               Preencha os dados e a anamnese
             </p>

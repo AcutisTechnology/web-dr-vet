@@ -55,14 +55,14 @@ const eventTypeLabels: Record<string, string> = {
   return: "Retorno",
 };
 const eventTypeColors: Record<string, string> = {
-  consultation: "bg-blue-100 text-blue-800",
-  vaccine: "bg-green-100 text-green-800",
-  exam: "bg-purple-100 text-purple-800",
-  prescription: "bg-orange-100 text-orange-800",
+  consultation: "bg-info/12 text-info",
+  vaccine: "bg-success/12 text-success",
+  exam: "bg-secondary text-secondary-foreground",
+  prescription: "bg-warning/12 text-[color:var(--warning)]",
   observation: "bg-gray-100 text-gray-800",
-  weight: "bg-cyan-100 text-cyan-800",
-  surgery: "bg-red-100 text-red-800",
-  return: "bg-yellow-100 text-yellow-800",
+  weight: "bg-accent/15 text-primary",
+  surgery: "bg-destructive/12 text-destructive",
+  return: "bg-warning/10 text-[color:var(--warning)]",
 };
 
 export default function ClienteDetailPage() {
@@ -181,7 +181,7 @@ export default function ClienteDetailPage() {
     if (!win) return;
     win.document.write(`
       <html><head><title>Receita</title>
-      <style>body{font-family:Arial;padding:30px;max-width:600px}h2{color:#333}hr{margin:20px 0}.block{margin:10px 0;padding:10px;border:1px solid #ddd;border-radius:4px}</style>
+      <style>body{font-family:Poppins,Arial,sans-serif;padding:30px;max-width:600px}h2{color:#1b2a6b}hr{margin:20px 0}.block{margin:10px 0;padding:10px;border:1px solid #dde3ee;border-radius:4px}</style>
       </head><body>
       <h2>VetDom – Receituário Veterinário</h2>
       <p><b>Pet:</b> ${effectivePet?.name} | <b>Data:</b> ${formatDate(event.date)}</p>
@@ -190,7 +190,7 @@ export default function ClienteDetailPage() {
       ${event.diagnosis ? `<div class="block"><b>Diagnóstico:</b><br/>${event.diagnosis}</div>` : ""}
       ${event.treatment ? `<div class="block"><b>Tratamento:</b><br/>${event.treatment}</div>` : ""}
       <hr/>
-      <p style="font-size:12px;color:#666">Impresso em ${new Date().toLocaleString("pt-BR")}</p>
+      <p style="font-size:12px;color:#5e6b85">Impresso em ${new Date().toLocaleString("pt-BR")}</p>
       </body></html>
     `);
     win.print();
@@ -227,13 +227,13 @@ export default function ClienteDetailPage() {
     );
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6 font-sans">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="shrink-0">
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div className="min-w-0">
-          <h1 className="text-xl sm:text-2xl font-bold truncate">{client.name}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold truncate [font-family:var(--font-heading)]">{client.name}</h1>
           <p className="text-muted-foreground text-sm truncate">
             {client.phone} {client.email && `• ${client.email}`}
           </p>
@@ -332,7 +332,7 @@ export default function ClienteDetailPage() {
                       </div>
                     </div>
                     {pet.notes && (
-                      <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1 mt-2">
+                      <p className="text-xs text-[color:var(--warning)] bg-warning/10 rounded px-2 py-1 mt-2">
                         {pet.notes}
                       </p>
                     )}
@@ -429,13 +429,13 @@ export default function ClienteDetailPage() {
                                   </p>
                                 )}
                                 {event.medications && (
-                                  <p className="text-sm mt-1 bg-orange-50 text-orange-800 rounded px-2 py-1">
+                                  <p className="text-sm mt-1 bg-warning/10 text-[color:var(--warning)] rounded px-2 py-1">
                                     <strong>Medicações:</strong>{" "}
                                     {JSON.stringify(event.medications)}
                                   </p>
                                 )}
                                 {event.exams && (
-                                  <p className="text-sm mt-1 bg-purple-50 text-purple-800 rounded px-2 py-1">
+                                  <p className="text-sm mt-1 bg-secondary text-secondary-foreground rounded px-2 py-1">
                                     <strong>Exames:</strong> {JSON.stringify(event.exams)}
                                   </p>
                                 )}

@@ -37,7 +37,7 @@ export default function PetsListPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link href={`/clientes/${id}`}>
@@ -49,7 +49,7 @@ export default function PetsListPage() {
           <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
             {client?.name ?? "Cliente"}
           </p>
-          <h1 className="text-xl font-bold leading-tight">Pets</h1>
+          <h1 className="text-xl font-bold leading-tight [font-family:var(--font-heading)]">Pets</h1>
         </div>
       </div>
 

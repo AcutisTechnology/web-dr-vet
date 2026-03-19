@@ -239,14 +239,14 @@ const EVT_LBL: Record<string, string> = {
   return: "Retorno",
 };
 const EVT_CLR: Record<string, string> = {
-  consultation: "bg-blue-100 text-blue-800",
-  vaccine: "bg-green-100 text-green-800",
-  exam: "bg-purple-100 text-purple-800",
-  prescription: "bg-orange-100 text-orange-800",
-  observation: "bg-gray-100 text-gray-800",
-  weight: "bg-cyan-100 text-cyan-800",
-  surgery: "bg-red-100 text-red-800",
-  return: "bg-yellow-100 text-yellow-800",
+  consultation: "bg-info/12 text-info",
+  vaccine: "bg-success/12 text-success",
+  exam: "bg-secondary text-secondary-foreground",
+  prescription: "bg-warning/12 text-[color:var(--warning)]",
+  observation: "bg-muted text-foreground",
+  weight: "bg-accent/15 text-primary",
+  surgery: "bg-destructive/12 text-destructive",
+  return: "bg-warning/10 text-[color:var(--warning)]",
 };
 
 function IR({ l, v }: { l: string; v?: string | number | null }) {
@@ -262,7 +262,7 @@ function BB({ l, v }: { l: string; v?: boolean }) {
   return (
     <div className="flex items-center gap-2 text-sm">
       {v ? (
-        <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+        <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
       ) : (
         <XCircle className="w-4 h-4 text-muted-foreground/40 shrink-0" />
       )}
@@ -708,7 +708,7 @@ export default function PetDetailPage() {
     const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(
-      `<html><head><title>Receita</title><style>body{font-family:Arial;padding:30px;max-width:600px}.blk{margin:10px 0;padding:10px;border:1px solid #ddd;border-radius:4px}</style></head><body><h2>VetDom – Receituário</h2><p><b>Pet:</b> ${pet?.name} | <b>Tutor:</b> ${client?.name} | <b>Data:</b> ${formatDate(event.date)}</p><hr/>${event.medications ? '<div class="blk"><b>Medicações:</b><br/>' + event.medications + "</div>" : ""}${event.diagnosis ? '<div class="blk"><b>Diagnóstico:</b><br/>' + event.diagnosis + "</div>" : ""}${event.treatment ? '<div class="blk"><b>Tratamento:</b><br/>' + event.treatment + "</div>" : ""}<hr/><p style="font-size:12px;color:#666">Impresso em ${new Date().toLocaleString("pt-BR")}</p></body></html>`,
+      `<html><head><title>Receita</title><style>body{font-family:Poppins,Arial,sans-serif;padding:30px;max-width:600px}.blk{margin:10px 0;padding:10px;border:1px solid #dde3ee;border-radius:4px}</style></head><body><h2 style="color:#1b2a6b">VetDom – Receituário</h2><p><b>Pet:</b> ${pet?.name} | <b>Tutor:</b> ${client?.name} | <b>Data:</b> ${formatDate(event.date)}</p><hr/>${event.medications ? '<div class="blk"><b>Medicações:</b><br/>' + event.medications + "</div>" : ""}${event.diagnosis ? '<div class="blk"><b>Diagnóstico:</b><br/>' + event.diagnosis + "</div>" : ""}${event.treatment ? '<div class="blk"><b>Tratamento:</b><br/>' + event.treatment + "</div>" : ""}<hr/><p style="font-size:12px;color:#5e6b85">Impresso em ${new Date().toLocaleString("pt-BR")}</p></body></html>`,
     );
     win.print();
   };
@@ -905,9 +905,9 @@ export default function PetDetailPage() {
     };
     const rb = (label: string, val?: boolean) =>
       `<tr><td class="l">${label}</td><td class="v">${b(val)}</td></tr>`;
-    const css = `body{font-family:Arial,sans-serif;padding:28px;font-size:12px;color:#111}
+    const css = `body{font-family:Poppins,Arial,sans-serif;padding:28px;font-size:12px;color:#111}
 h1{font-size:17px;margin:0 0 3px}p.sub{font-size:11px;color:#555;margin:0 0 14px}
-h2{font-size:11px;font-weight:700;background:#eef2ff;padding:3px 8px;margin:14px 0 5px;border-left:3px solid #4f46e5;text-transform:uppercase;letter-spacing:.04em}
+h2{font-size:11px;font-weight:700;background:#eef2ff;padding:3px 8px;margin:14px 0 5px;border-left:3px solid #1b2a6b;text-transform:uppercase;letter-spacing:.04em}
 table{width:100%;border-collapse:collapse}td{padding:2px 5px;vertical-align:top}
 td.l{width:46%;color:#666;font-size:11px}td.v{font-weight:600;font-size:12px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}
@@ -1073,19 +1073,19 @@ ${r("Observações clínicas", an.clinicalObservations)}
 
     const rxCss = `
       *{box-sizing:border-box;margin:0;padding:0}
-      body{font-family:'Arial',sans-serif;font-size:13px;color:#1a1a1a;background:#fff}
+      body{font-family:'Poppins',Arial,sans-serif;font-size:13px;color:#1a1a1a;background:#fff}
       .page{max-width:720px;margin:0 auto;padding:32px 40px}
-      .header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:16px;border-bottom:3px solid #4f46e5;margin-bottom:20px}
+      .header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:16px;border-bottom:3px solid #1b2a6b;margin-bottom:20px}
       .logo-area{display:flex;align-items:center;gap:12px}
       .logo-img{width:56px;height:56px;object-fit:contain;border-radius:8px}
-      .logo-text{font-size:22px;font-weight:800;color:#4f46e5;letter-spacing:-.5px}.logo-text span{color:#2563eb}
+      .logo-text{font-size:22px;font-weight:800;color:#1b2a6b;letter-spacing:-.5px}.logo-text span{color:#2f7eea}
       .logo-subtext{font-size:10px;color:#666;margin-top:2px}
       .clinic-info{text-align:right;font-size:11px;color:#555;line-height:1.6}
       .patient{background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;padding:10px 14px;margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
       .patient .field .lbl{font-size:9px;text-transform:uppercase;color:#7c3aed;font-weight:700;letter-spacing:.06em}.patient .field .val{font-size:12px;font-weight:600}
-      h2{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#4f46e5;font-weight:700;margin-bottom:10px;padding-bottom:4px;border-bottom:1px solid #e0e7ff}
+      h2{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#1b2a6b;font-weight:700;margin-bottom:10px;padding-bottom:4px;border-bottom:1px solid #e0e7ff}
       .item{display:grid;grid-template-columns:24px 1fr;gap:0 10px;margin-bottom:14px;page-break-inside:avoid}
-      .item-num{width:24px;height:24px;background:#4f46e5;color:#fff;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px}
+      .item-num{width:24px;height:24px;background:#1b2a6b;color:#fff;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px}
       .item-body .med{font-size:14px;font-weight:700;color:#1e1b4b}
       .item-body .details{font-size:11px;color:#555;margin-top:3px;line-height:1.7}
       .item-body .item-notes{font-size:11px;color:#7c3aed;font-style:italic;margin-top:2px}
@@ -1172,7 +1172,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
   if (!pet) return null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 font-sans">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <Link href={`/clientes/${clientId}`}>
@@ -1182,7 +1182,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
           </Link>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg sm:text-xl font-bold">{pet.name}</h1>
+              <h1 className="text-lg sm:text-xl font-bold [font-family:var(--font-heading)]">{pet.name}</h1>
               {pet.status === "deceased" && (
                 <Badge variant="destructive">Óbito</Badge>
               )}
@@ -1402,7 +1402,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                         <p className="text-xs text-muted-foreground">
                           Observações
                         </p>
-                        <p className="text-sm bg-amber-50 text-amber-800 rounded px-3 py-2">
+                        <p className="text-sm bg-warning/10 text-[color:var(--warning)] rounded px-3 py-2">
                           {pet.notes}
                         </p>
                       </div>
@@ -2231,67 +2231,67 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                             </SelectItem>
                             <SelectItem value="Uso oral">
                               <span className="flex items-center gap-2">
-                                <span className="text-blue-600">💊</span>
+                                <span className="text-info">💊</span>
                                 Uso oral
                               </span>
                             </SelectItem>
                             <SelectItem value="Uso tópico">
                               <span className="flex items-center gap-2">
-                                <span className="text-green-600">🧴</span>
+                                <span className="text-success">🧴</span>
                                 Uso tópico
                               </span>
                             </SelectItem>
                             <SelectItem value="Uso otológico">
                               <span className="flex items-center gap-2">
-                                <span className="text-purple-600">👂</span>
+                                <span className="text-primary">👂</span>
                                 Uso otológico
                               </span>
                             </SelectItem>
                             <SelectItem value="Uso oftálmico">
                               <span className="flex items-center gap-2">
-                                <span className="text-cyan-600">👁️</span>
+                                <span className="text-accent">👁️</span>
                                 Uso oftálmico
                               </span>
                             </SelectItem>
                             <SelectItem value="Uso intranasal">
                               <span className="flex items-center gap-2">
-                                <span className="text-pink-600">👃</span>
+                                <span className="text-primary">👃</span>
                                 Uso intranasal
                               </span>
                             </SelectItem>
                             <SelectItem value="Uso inalatório">
                               <span className="flex items-center gap-2">
-                                <span className="text-indigo-600">💨</span>
+                                <span className="text-info">💨</span>
                                 Uso inalatório
                               </span>
                             </SelectItem>
                             <SelectItem value="Uso subcutâneo">
                               <span className="flex items-center gap-2">
-                                <span className="text-orange-600">💉</span>
+                                <span className="text-[color:var(--warning)]">💉</span>
                                 Uso subcutâneo (SC)
                               </span>
                             </SelectItem>
                             <SelectItem value="Uso intramuscular">
                               <span className="flex items-center gap-2">
-                                <span className="text-red-600">💉</span>
+                                <span className="text-destructive">💉</span>
                                 Uso intramuscular (IM)
                               </span>
                             </SelectItem>
                             <SelectItem value="Uso intravenoso">
                               <span className="flex items-center gap-2">
-                                <span className="text-rose-600">💉</span>
+                                <span className="text-destructive">💉</span>
                                 Uso intravenoso (IV)
                               </span>
                             </SelectItem>
                             <SelectItem value="Uso retal">
                               <span className="flex items-center gap-2">
-                                <span className="text-amber-600">🔸</span>
+                                <span className="text-[color:var(--warning)]">🔸</span>
                                 Uso retal
                               </span>
                             </SelectItem>
                             <SelectItem value="Uso intravaginal">
                               <span className="flex items-center gap-2">
-                                <span className="text-fuchsia-600">🔹</span>
+                                <span className="text-primary">🔹</span>
                                 Uso intravaginal
                               </span>
                             </SelectItem>
@@ -2645,7 +2645,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                                             if (!line.trim()) return <div key={i} className="h-2" />;
                                             if (SECTION_EMOJI.test(line)) {
                                               return (
-                                                <p key={i} className="font-bold text-[#1B2A6B] mt-3 mb-1">
+                                                <p key={i} className="font-bold text-primary mt-3 mb-1">
                                                   {line}
                                                 </p>
                                               );
@@ -2671,7 +2671,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                                             );
                                           })}
                                           {event.notes && (
-                                            <p className="text-amber-700 bg-amber-50 rounded px-2 py-1.5 mt-2 border border-amber-100">
+                                            <p className="text-[color:var(--warning)] bg-warning/10 rounded px-2 py-1.5 mt-2 border border-warning/20">
                                               {event.notes}
                                             </p>
                                           )}
@@ -2837,7 +2837,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                   <p className="text-xs text-muted-foreground">
                     Receita (Consultas)
                   </p>
-                  <p className="text-xl font-bold text-green-600">
+                  <p className="text-xl font-bold text-success">
                     {formatCurrency(petFinanceSummary.revenue)}
                   </p>
                 </CardContent>
@@ -2847,18 +2847,18 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                   <p className="text-xs text-muted-foreground">
                     Custos{isAutonomous ? " (incl. combustível)" : ""}
                   </p>
-                  <p className="text-xl font-bold text-red-500">
+                  <p className="text-xl font-bold text-destructive">
                     {formatCurrency(petFinanceSummary.cost)}
                   </p>
                 </CardContent>
               </Card>
               {petFinanceSummary.pdvRevenue > 0 && (
-                <Card className="border-blue-200 bg-blue-50/40">
+                <Card className="border-info/30 bg-info/8">
                   <CardContent className="p-4">
                     <p className="text-xs text-muted-foreground">
                       Receita PDV (Produtos/Serviços)
                     </p>
-                    <p className="text-xl font-bold text-blue-600">
+                    <p className="text-xl font-bold text-info">
                       {formatCurrency(petFinanceSummary.pdvRevenue)}
                     </p>
                   </CardContent>
@@ -2873,8 +2873,8 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                         petFinanceSummary.pdvRevenue -
                         petFinanceSummary.cost >=
                       0
-                        ? "text-[#1B2A6B]"
-                        : "text-red-600"
+                        ? "text-primary"
+                        : "text-destructive"
                     }`}
                   >
                     {formatCurrency(
@@ -2936,8 +2936,8 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                                   <span
                                     className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                                       isIncome
-                                        ? "bg-green-100 text-green-800"
-                                        : "bg-red-100 text-red-800"
+                                        ? "bg-success/12 text-success"
+                                        : "bg-destructive/12 text-destructive"
                                     }`}
                                   >
                                     {PET_FINANCE_LABELS[
@@ -2949,7 +2949,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                                   {entry.description}
                                 </td>
                                 <td
-                                  className={`px-4 py-2 text-right font-semibold ${isIncome ? "text-green-600" : "text-red-500"}`}
+                                  className={`px-4 py-2 text-right font-semibold ${isIncome ? "text-success" : "text-destructive"}`}
                                 >
                                   {isIncome ? "+" : "-"}
                                   {formatCurrency(entry.amount)}
@@ -2966,13 +2966,13 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                   {saleEntries.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                        <span className="inline-block w-2 h-2 rounded-full bg-blue-400" />
+                        <span className="inline-block w-2 h-2 rounded-full bg-info" />
                         Vendas PDV (somente leitura)
                       </p>
-                      <div className="rounded-lg border border-blue-100 overflow-hidden">
+                      <div className="rounded-lg border border-info/20 overflow-hidden">
                         <table className="w-full text-sm">
                           <thead>
-                            <tr className="border-b bg-blue-50/60">
+                            <tr className="border-b bg-info/8">
                               <th className="text-left px-4 py-2 font-medium">
                                 Data
                               </th>
@@ -2988,7 +2988,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                             {saleEntries.map((entry) => (
                               <tr
                                 key={entry.id}
-                                className="border-b last:border-0 hover:bg-blue-50/40"
+                                className="border-b last:border-0 hover:bg-info/6"
                               >
                                 <td className="px-4 py-2 text-muted-foreground">
                                   {formatDate(entry.dueDate)}
@@ -2996,7 +2996,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                                 <td className="px-4 py-2">
                                   {entry.description}
                                 </td>
-                                <td className="px-4 py-2 text-right font-semibold text-green-600">
+                                <td className="px-4 py-2 text-right font-semibold text-success">
                                   +{formatCurrency(entry.amount)}
                                 </td>
                               </tr>
@@ -3223,20 +3223,20 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                     </div>
                   </div>
                   {financeForm.petFinanceType === "consultation" && (
-                    <p className="text-xs text-muted-foreground bg-green-50 border border-green-100 rounded px-3 py-2">
+                    <p className="text-xs text-muted-foreground bg-success/10 border border-success/20 rounded px-3 py-2">
                       Consultas são lançadas como <strong>receita pura</strong>{" "}
                       — sem custo associado.
                     </p>
                   )}
                   {financeForm.petFinanceType === "exam" && (
-                    <p className="text-xs text-muted-foreground bg-blue-50 border border-blue-100 rounded px-3 py-2">
+                    <p className="text-xs text-muted-foreground bg-info/8 border border-info/20 rounded px-3 py-2">
                       O valor <strong>cobrado do cliente</strong> entra como
                       receita. O valor <strong>pago ao laboratório</strong>{" "}
                       entra como custo. Ambos são opcionais.
                     </p>
                   )}
                   {financeForm.petFinanceType === "medication" && (
-                    <p className="text-xs text-muted-foreground bg-amber-50 border border-amber-100 rounded px-3 py-2">
+                    <p className="text-xs text-muted-foreground bg-warning/10 border border-warning/20 rounded px-3 py-2">
                       O valor <strong>cobrado do cliente</strong> entra como
                       receita. O <strong>custo do medicamento</strong> entra
                       como despesa. Ambos são opcionais.
@@ -3245,7 +3245,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                   {financeForm.petFinanceType !== "consultation" &&
                     financeForm.petFinanceType !== "exam" &&
                     financeForm.petFinanceType !== "medication" && (
-                      <p className="text-xs text-muted-foreground bg-red-50 border border-red-100 rounded px-3 py-2">
+                      <p className="text-xs text-muted-foreground bg-destructive/10 border border-destructive/20 rounded px-3 py-2">
                         Este lançamento será registrado como{" "}
                         <strong>custo</strong> e abatido do lucro.
                       </p>
