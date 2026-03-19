@@ -10,6 +10,8 @@ import {
   Download,
   CheckCircle2,
   XCircle,
+  ClipboardList,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +48,8 @@ import { adaptApiFinanceEntryToFinanceEntry } from "@/adapters/finance.adapter";
 import type { ApiMedicalEvent } from "@/types/api";
 import type { Pet, Client, PetAnamnesis, FinanceEntry } from "@/types";
 import { useSessionStore } from "@/stores/session";
+import { useLogoStore } from "@/stores/logo";
+import { AnamnesisDrawer } from "@/components/pet/anamnesis-drawer";
 import { formatDate, formatCurrency, exportToCSV } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -272,6 +276,7 @@ export default function PetDetailPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { user: currentUser } = useSessionStore();
+  const { getLogo } = useLogoStore();
   const isAutonomous = currentUser?.accountType === "autonomous";
   const qc = useQueryClient();
   const { data: pet, isLoading: loadingPet } = useQuery({
@@ -338,6 +343,12 @@ export default function PetDetailPage() {
     notes: "",
   });
   const [an, setAn] = useState<PetAnamnesis>({ ...EMPTY_AN });
+  // Prontuário — anamnese snapshot
+  const [drawerEvent, setDrawerEvent] = useState<import("@/types/api").ApiMedicalEvent | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [saveAnamnesisDialogOpen, setSaveAnamnesisDialogOpen] = useState(false);
+  const [anamnesisTitle, setAnamnesisTitle] = useState("");
+  const [savingSnapshot, setSavingSnapshot] = useState(false);
   const [rx, setRx] = useState({
     vetName: "",
     vetCrmv: "",
@@ -647,6 +658,34 @@ export default function PetDetailPage() {
       ),
     );
     updateAnamnesisM.mutate(cleaned);
+  };
+
+  const handleSaveAnamnesisSnapshot = async () => {
+    if (!pet) return;
+    setSavingSnapshot(true);
+    try {
+      const snapshot = Object.fromEntries(
+        Object.entries(an).filter(([, v]) => v !== undefined && v !== null && v !== ""),
+      );
+      const title = anamnesisTitle.trim() || `Anamnese – ${new Date().toLocaleDateString("pt-BR")}`;
+      await medicalEventService.create({
+        pet_id: pet.id,
+        type: "observation",
+        date: new Date().toISOString().split("T")[0],
+        title,
+        description: "Snapshot de anamnese salvo pelo veterinário.",
+        anamnesis_snapshot: snapshot,
+      });
+      qc.invalidateQueries({ queryKey: ["medical-events", petId] });
+      toast({ title: `Anamnese salva no prontuário: "${title}"` });
+      setSaveAnamnesisDialogOpen(false);
+      setAnamnesisTitle("");
+      setActiveTab("prontuario");
+    } catch {
+      toast({ title: "Erro ao salvar anamnese no prontuário", variant: "destructive" });
+    } finally {
+      setSavingSnapshot(false);
+    }
   };
   const handleMarkDeceased = () => {
     if (!pet || !confirm(`Marcar ${pet.name} como falecido?`)) return;
@@ -1026,12 +1065,21 @@ ${r("Observações clínicas", an.clinicalObservations)}
     if (!pet || !client) return;
     const win = window.open("", "_blank");
     if (!win) return;
+
+    // Use user's custom logo or fall back to DrVet branding
+    const userLogoUrl = currentUser?.id ? getLogo(currentUser.id) : null;
+    const clinicDisplayName = currentUser?.clinicName || rx.clinicName || "DrVet";
+    const doctorName = rx.vetName || currentUser?.name || "Médico(a) Veterinário(a)";
+
     const rxCss = `
       *{box-sizing:border-box;margin:0;padding:0}
       body{font-family:'Arial',sans-serif;font-size:13px;color:#1a1a1a;background:#fff}
       .page{max-width:720px;margin:0 auto;padding:32px 40px}
       .header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:16px;border-bottom:3px solid #4f46e5;margin-bottom:20px}
-      .logo{font-size:22px;font-weight:800;color:#4f46e5;letter-spacing:-.5px}.logo span{color:#2563eb}
+      .logo-area{display:flex;align-items:center;gap:12px}
+      .logo-img{width:56px;height:56px;object-fit:contain;border-radius:8px}
+      .logo-text{font-size:22px;font-weight:800;color:#4f46e5;letter-spacing:-.5px}.logo-text span{color:#2563eb}
+      .logo-subtext{font-size:10px;color:#666;margin-top:2px}
       .clinic-info{text-align:right;font-size:11px;color:#555;line-height:1.6}
       .patient{background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;padding:10px 14px;margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
       .patient .field .lbl{font-size:9px;text-transform:uppercase;color:#7c3aed;font-weight:700;letter-spacing:.06em}.patient .field .val{font-size:12px;font-weight:600}
@@ -1061,15 +1109,29 @@ ${r("Observações clínicas", an.clinicalObservations)}
       </div>`,
       )
       .join("");
+
+    // Header left: logo image if available, else DrVet text
+    const headerLogoHtml = userLogoUrl
+      ? `<div class="logo-area">
+          <img src="${userLogoUrl}" alt="Logo" class="logo-img" />
+          <div>
+            <div class="logo-text">${clinicDisplayName}</div>
+            <div class="logo-subtext">Dr. ${doctorName}</div>
+          </div>
+        </div>`
+      : `<div class="logo-area">
+          <div>
+            <div class="logo-text">Dr<span>Vet</span></div>
+            <div class="logo-subtext">${clinicDisplayName}</div>
+            <div style="font-size:10px;color:#888;margin-top:1px">Dr. ${doctorName}</div>
+          </div>
+        </div>`;
+
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receituário – ${pet.name}</title><style>${rxCss}</style></head>
 <body><div class="page">
 <div class="header">
-  <div>
-    <div class="logo">Dr<span>Vet</span></div>
-    <div style="font-size:10px;color:#666;margin-top:2px">Sistema de Gestão Veterinária</div>
-  </div>
+  ${headerLogoHtml}
   <div class="clinic-info">
-    ${rx.clinicName ? `<b>${rx.clinicName}</b><br/>` : ""}
     ${rx.clinicAddress ? `${rx.clinicAddress}<br/>` : ""}
     ${rx.clinicPhone ? `Tel: ${rx.clinicPhone}<br/>` : ""}
     Data: ${formatDate(rx.date || new Date().toISOString())}
@@ -1087,14 +1149,14 @@ ${itemsHtml || "<p style='color:#aaa;font-size:12px'>Nenhum item prescrito.</p>"
 ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` : ""}
 <div class="footer">
   <div class="sig-box">
-    ${rx.vetName || "Médico(a) Veterinário(a)"}<br/>
+    ${doctorName}<br/>
     ${rx.vetCrmv ? `CRMV: ${rx.vetCrmv}` : "CRMV: ___________________"}
   </div>
   <div class="sig-box">
     Assinatura<br/>&nbsp;
   </div>
 </div>
-<div class="disclaimer">Este receituário é válido por 30 dias a partir da data de emissão. DrVet – Sistema de Gestão Veterinária</div>
+<div class="disclaimer">Este receituário é válido por 30 dias a partir da data de emissão. ${clinicDisplayName} – Sistema de Gestão Veterinária</div>
 </div></body></html>`;
     win.document.write(html);
     win.document.close();
@@ -2494,22 +2556,35 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
           {/* PRONTUÁRIO */}
           <TabsContent value="prontuario">
             <div className="space-y-4">
+              {/* Header */}
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <p className="font-medium text-sm">
                   Histórico clínico de{" "}
                   <span className="text-primary font-semibold">{pet.name}</span>
                 </p>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-violet-300 text-violet-700 hover:bg-violet-50"
+                    onClick={() => setSaveAnamnesisDialogOpen(true)}
+                  >
+                    <ClipboardList className="w-4 h-4 mr-1" />
+                    Salvar anamnese atual
+                  </Button>
                   <Button variant="outline" size="sm" onClick={handleExportCSV}>
                     <Download className="w-4 h-4 mr-1" />
                     Exportar CSV
                   </Button>
                 </div>
               </div>
+
               {events.length === 0 ? (
                 <Card>
-                  <CardContent className="py-12 text-center text-muted-foreground">
-                    Nenhum evento registrado no prontuário
+                  <CardContent className="py-12 text-center text-muted-foreground space-y-2">
+                    <BookOpen className="w-10 h-10 mx-auto opacity-20" />
+                    <p>Nenhum evento registrado no prontuário.</p>
+                    <p className="text-xs">Use o botão acima para salvar um snapshot da anamnese atual.</p>
                   </CardContent>
                 </Card>
               ) : (
@@ -2517,78 +2592,149 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                   <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
                   <div className="space-y-4 pl-10">
                     {events.map((event) => {
+                      const isAnamnesis = !!event.anamnesis_snapshot;
+                      const dotColor = isAnamnesis
+                        ? "bg-violet-500"
+                        : (EVT_CLR[event.type] ?? "bg-gray-100 text-gray-800").split(" ")[0];
+
                       return (
                         <div key={event.id} className="relative">
-                          <div
-                            className={`absolute -left-6 top-3 w-3 h-3 rounded-full border-2 border-background ${(EVT_CLR[event.type] ?? "bg-gray-100 text-gray-800").split(" ")[0]}`}
-                          />
-                          <Card>
+                          <div className={`absolute -left-6 top-3 w-3 h-3 rounded-full border-2 border-background ${dotColor}`} />
+                          <Card className={isAnamnesis ? "border-violet-200 bg-violet-50/30" : ""}>
                             <CardContent className="p-4">
                               <div className="flex items-start justify-between gap-2">
-                                <div className="flex-1">
+                                <div className="flex-1 min-w-0">
+                                  {/* Badges */}
                                   <div className="flex items-center gap-2 flex-wrap">
-                                    <span
-                                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${EVT_CLR[event.type] ?? "bg-gray-100 text-gray-800"}`}
-                                    >
-                                      {EVT_LBL[event.type] ?? event.type}
-                                    </span>
+                                    {isAnamnesis ? (
+                                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-violet-100 text-violet-700">
+                                        Anamnese
+                                      </span>
+                                    ) : (
+                                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${EVT_CLR[event.type] ?? "bg-gray-100 text-gray-800"}`}>
+                                        {EVT_LBL[event.type] ?? event.type}
+                                      </span>
+                                    )}
+                                    {event.title && !isAnamnesis && (
+                                      <span className="text-xs text-muted-foreground truncate">{event.title}</span>
+                                    )}
                                   </div>
+
+                                  {/* Title for anamnesis */}
+                                  {isAnamnesis && event.title && (
+                                    <p className="text-sm font-semibold text-violet-900 mt-1">{event.title}</p>
+                                  )}
+
+                                  {/* Date + vet */}
                                   <p className="text-xs text-muted-foreground mt-1">
                                     {formatDate(event.date)}
-                                    {event.vet && ` • ${event.vet.name}`}
+                                    {event.vet && ` · Dr(a). ${event.vet.name}`}
                                   </p>
-                                  {event.description && (
-                                    <p className="text-sm mt-2">
-                                      {event.description}
-                                    </p>
-                                  )}
-                                  {event.vital_signs && (
-                                    <p className="text-sm mt-1 bg-muted p-2 rounded">
-                                      <strong>Sinais vitais:</strong>{" "}
-                                      {event.vital_signs}
-                                    </p>
-                                  )}
-                                  {event.diagnosis && (
-                                    <p className="text-sm mt-1">
-                                      <strong>Diagnóstico:</strong>{" "}
-                                      {event.diagnosis}
-                                    </p>
-                                  )}
-                                  {event.treatment && (
-                                    <p className="text-sm mt-1">
-                                      <strong>Tratamento:</strong>{" "}
-                                      {event.treatment}
-                                    </p>
-                                  )}
-                                  {event.exams && (
-                                    <p className="text-sm mt-1 bg-muted p-2 rounded">
-                                      <strong>Exames:</strong> {event.exams}
-                                    </p>
-                                  )}
-                                  {event.medications && (
-                                    <p className="text-sm mt-1 bg-orange-50 text-orange-800 rounded px-2 py-1">
-                                      <strong>Medicações:</strong>{" "}
-                                      {event.medications}
-                                    </p>
-                                  )}
-                                  {event.notes && (
-                                    <p className="text-sm mt-1 text-muted-foreground italic">
-                                      {event.notes}
+
+                                  {/* Regular event fields */}
+                                  {!isAnamnesis && (() => {
+                                    const isAiEvent = event.title?.startsWith("IA:");
+                                    if (isAiEvent) {
+                                      // Render AI diagnosis with formatted sections
+                                      // The backend uses \n and emoji-prefixed headers
+                                      const SECTION_EMOJI = /^[🤖📋🔍🧪💊📝⚠️]/u;
+                                      const lines = (event.description ?? "").split("\n");
+                                      return (
+                                        <div className="mt-2 space-y-0.5 text-xs">
+                                          {lines.map((line, i) => {
+                                            if (!line.trim()) return <div key={i} className="h-2" />;
+                                            if (SECTION_EMOJI.test(line)) {
+                                              return (
+                                                <p key={i} className="font-bold text-[#1B2A6B] mt-3 mb-1">
+                                                  {line}
+                                                </p>
+                                              );
+                                            }
+                                            if (line.startsWith("•")) {
+                                              return (
+                                                <p key={i} className="text-gray-700 pl-2">
+                                                  {line}
+                                                </p>
+                                              );
+                                            }
+                                            if (line.startsWith("  ")) {
+                                              return (
+                                                <p key={i} className="text-muted-foreground pl-4">
+                                                  {line.trim()}
+                                                </p>
+                                              );
+                                            }
+                                            return (
+                                              <p key={i} className="text-gray-700">
+                                                {line}
+                                              </p>
+                                            );
+                                          })}
+                                          {event.notes && (
+                                            <p className="text-amber-700 bg-amber-50 rounded px-2 py-1.5 mt-2 border border-amber-100">
+                                              {event.notes}
+                                            </p>
+                                          )}
+                                        </div>
+                                      );
+                                    }
+                                    return (
+                                      <>
+                                        {event.description && (
+                                          <p className="text-sm mt-2 text-gray-700">{event.description}</p>
+                                        )}
+                                        {event.diagnosis && (
+                                          <p className="text-sm mt-1">
+                                            <strong>Diagnóstico:</strong> {event.diagnosis}
+                                          </p>
+                                        )}
+                                        {event.treatment && (
+                                          <p className="text-sm mt-1">
+                                            <strong>Tratamento:</strong> {event.treatment}
+                                          </p>
+                                        )}
+                                        {event.notes && (
+                                          <p className="text-sm mt-1 text-muted-foreground italic">{event.notes}</p>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
+
+                                  {/* Anamnesis snapshot preview */}
+                                  {isAnamnesis && (
+                                    <p className="text-xs text-violet-600 mt-1.5">
+                                      {Object.keys(event.anamnesis_snapshot ?? {}).length} campos preenchidos
                                     </p>
                                   )}
                                 </div>
-                                {event.type === "prescription" && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() =>
-                                      handlePrintPrescription(event)
-                                    }
-                                    title="Imprimir receita"
-                                  >
-                                    <Printer className="w-4 h-4" />
-                                  </Button>
-                                )}
+
+                                {/* Actions */}
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {isAnamnesis && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="border-violet-200 text-violet-700 hover:bg-violet-50 text-xs h-8"
+                                      onClick={() => {
+                                        setDrawerEvent(event);
+                                        setDrawerOpen(true);
+                                      }}
+                                    >
+                                      <ClipboardList className="w-3.5 h-3.5 mr-1" />
+                                      Ver anamnese
+                                    </Button>
+                                  )}
+                                  {event.type === "prescription" && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handlePrintPrescription(event)}
+                                      title="Imprimir receita"
+                                    >
+                                      <Printer className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
                             </CardContent>
                           </Card>
@@ -2599,6 +2745,60 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                 </div>
               )}
             </div>
+
+            {/* Dialog: Save anamnesis snapshot */}
+            <Dialog open={saveAnamnesisDialogOpen} onOpenChange={setSaveAnamnesisDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <ClipboardList className="w-5 h-5 text-violet-600" />
+                    Salvar anamnese no prontuário
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <p className="text-sm text-muted-foreground">
+                    Um snapshot completo da anamnese atual será salvo como registro no prontuário de <strong>{pet.name}</strong>.
+                  </p>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="anamnesis-title">
+                      Título do registro{" "}
+                      <span className="text-muted-foreground font-normal">(opcional)</span>
+                    </Label>
+                    <input
+                      id="anamnesis-title"
+                      type="text"
+                      value={anamnesisTitle}
+                      onChange={(e) => setAnamnesisTitle(e.target.value)}
+                      placeholder={`Anamnese – ${new Date().toLocaleDateString("pt-BR")}`}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400 transition-all"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Se não informar, o título será gerado com a data de hoje.
+                    </p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setSaveAnamnesisDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleSaveAnamnesisSnapshot}
+                    disabled={savingSnapshot}
+                    className="bg-violet-600 hover:bg-violet-700 text-white"
+                  >
+                    <ClipboardList className="w-4 h-4 mr-2" />
+                    {savingSnapshot ? "Salvando..." : "Salvar no prontuário"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Drawer: View anamnesis snapshot */}
+            <AnamnesisDrawer
+              event={drawerEvent}
+              open={drawerOpen}
+              onOpenChange={setDrawerOpen}
+            />
           </TabsContent>
 
           {/* FINANCEIRO */}

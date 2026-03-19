@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useSessionStore } from "@/stores/session";
+import { useLogoStore } from "@/stores/logo";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -26,7 +27,13 @@ import {
   Eye,
   EyeOff,
   Save,
+  ImageIcon,
+  Upload,
+  X,
+  Loader2,
 } from "lucide-react";
+import Image from "next/image";
+import { supabase, LOGO_BUCKET } from "@/lib/supabase";
 
 const ACCOUNT_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   clinic_owner: {
@@ -51,7 +58,8 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export default function PerfilPage() {
-  const { user, token, login } = useSessionStore();
+  const { user, token, login, updateUser } = useSessionStore();
+  const { getLogo, setLogo, removeLogo } = useLogoStore();
   const { toast } = useToast();
 
   const [profileForm, setProfileForm] = useState({
@@ -70,7 +78,15 @@ export default function PerfilPage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
 
+  // Logo state
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   if (!user) return null;
+
+  const currentLogoUrl = getLogo(user.id);
 
   const initials = user.name
     .split(" ")
@@ -129,6 +145,91 @@ export default function PerfilPage() {
     setSavingPassword(false);
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate type
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Selecione um arquivo de imagem.", variant: "destructive" });
+      return;
+    }
+    // Validate size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "A imagem deve ter no máximo 2MB.", variant: "destructive" });
+      return;
+    }
+
+    setSelectedFile(file);
+    const url = URL.createObjectURL(file);
+    setLogoPreview(url);
+  };
+
+  const handleUploadLogo = async () => {
+    if (!selectedFile || !user) return;
+
+    setUploadingLogo(true);
+    try {
+      const ext = selectedFile.name.split(".").pop()?.toLowerCase() ?? "png";
+      const filePath = `${user.id}/logo.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(LOGO_BUCKET)
+        .upload(filePath, selectedFile, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from(LOGO_BUCKET)
+        .getPublicUrl(filePath);
+
+      const publicUrl = `${data.publicUrl}?t=${Date.now()}`;
+      setLogo(user.id, publicUrl);
+      updateUser({ logoUrl: publicUrl });
+      setSelectedFile(null);
+      setLogoPreview(null);
+      toast({ title: "Logo enviada com sucesso!" });
+    } catch (err) {
+      console.error("Upload error:", err);
+      toast({
+        title: "Erro ao enviar logo. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingLogo(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    if (!user) return;
+    setUploadingLogo(true);
+    try {
+      // Try to remove from storage (ignore error if not exists)
+      await supabase.storage
+        .from(LOGO_BUCKET)
+        .remove([`${user.id}/logo.png`, `${user.id}/logo.jpg`, `${user.id}/logo.jpeg`, `${user.id}/logo.webp`]);
+
+      removeLogo(user.id);
+      updateUser({ logoUrl: undefined });
+      setLogoPreview(null);
+      setSelectedFile(null);
+      toast({ title: "Logo removida com sucesso." });
+    } catch {
+      removeLogo(user.id);
+      updateUser({ logoUrl: undefined });
+      toast({ title: "Logo removida." });
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleCancelPreview = () => {
+    setLogoPreview(null);
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Header */}
@@ -144,6 +245,9 @@ export default function PerfilPage() {
         <CardContent className="pt-6">
           <div className="flex items-center gap-5">
             <Avatar className="w-20 h-20 shrink-0">
+              {currentLogoUrl ? (
+                <AvatarImage src={currentLogoUrl} alt={user.name} className="object-cover" />
+              ) : null}
               <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-[#1B2A6B] to-[#2DC6C6] text-white">
                 {initials}
               </AvatarFallback>
@@ -178,6 +282,130 @@ export default function PerfilPage() {
                   </Badge>
                 )}
               </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Logo Upload Card ─────────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <ImageIcon className="w-4 h-4 text-[#1B2A6B]" />
+            Logo da {user.accountType === "autonomous" ? "Clínica / Perfil" : "Clínica"}
+          </CardTitle>
+          <CardDescription>
+            Sua logo aparece na sidebar e nos receituários gerados. Se não inserir, a logo padrão DrVet será usada.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Current logo or placeholder */}
+          <div className="flex items-center gap-5">
+            <div className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden bg-gray-50 shrink-0">
+              {logoPreview ? (
+                <Image
+                  src={logoPreview}
+                  alt="Preview da logo"
+                  width={96}
+                  height={96}
+                  className="object-contain w-full h-full"
+                  unoptimized
+                />
+              ) : currentLogoUrl ? (
+                <Image
+                  src={currentLogoUrl}
+                  alt="Logo atual"
+                  width={96}
+                  height={96}
+                  className="object-contain w-full h-full"
+                  unoptimized
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-1 text-gray-400">
+                  <ImageIcon className="w-8 h-8" />
+                  <span className="text-[10px]">Padrão DrVet</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 space-y-3">
+              {logoPreview ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Imagem selecionada. Clique em &ldquo;Salvar logo&rdquo; para confirmar.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleUploadLogo}
+                      disabled={uploadingLogo}
+                      size="sm"
+                      className="bg-[#1B2A6B] hover:bg-[#1B2A6B]/90"
+                    >
+                      {uploadingLogo ? (
+                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando...</>
+                      ) : (
+                        <><Upload className="w-4 h-4 mr-2" />Salvar logo</>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={handleCancelPreview}
+                      disabled={uploadingLogo}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    {currentLogoUrl
+                      ? "Sua logo personalizada está ativa."
+                      : "Nenhuma logo cadastrada. O logo padrão DrVet é exibido."}
+                  </p>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingLogo}
+                      size="sm"
+                      variant="outline"
+                      className="border-[#1B2A6B] text-[#1B2A6B] hover:bg-[#1B2A6B]/5"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      {currentLogoUrl ? "Trocar logo" : "Enviar logo"}
+                    </Button>
+                    {currentLogoUrl && (
+                      <Button
+                        onClick={handleRemoveLogo}
+                        disabled={uploadingLogo}
+                        size="sm"
+                        variant="outline"
+                        className="border-destructive text-destructive hover:bg-destructive/5"
+                      >
+                        {uploadingLogo ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <X className="w-4 h-4 mr-1" />
+                        )}
+                        Remover logo
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <p className="text-xs text-muted-foreground">
+                Formatos aceitos: PNG, JPG, WEBP. Tamanho máximo: 2MB.
+              </p>
             </div>
           </div>
         </CardContent>

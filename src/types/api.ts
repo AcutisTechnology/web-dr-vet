@@ -7,6 +7,10 @@ export interface ApiUser {
   clinic_id: string | null;
   phone: string | null;
   avatar: string | null;
+  logo_url: string | null;
+  permissions: Record<string, boolean> | null;
+  invite_status: string | null;
+  invite_sent_at: string | null;
   active: boolean;
   clinic: ApiClinic | null;
   created_at: string;
@@ -151,13 +155,23 @@ export interface ApiMedicalEvent {
   pet_id?: string;
   type: string;
   date: string;
+  title: string | null;
   description: string | null;
-  vital_signs: string | null;
-  medications: string | null;
-  exams: string | null;
+  vital_signs: Record<string, unknown> | null;
+  medications: Record<string, unknown> | null;
+  exams: Record<string, unknown> | null;
   diagnosis: string | null;
   treatment: string | null;
   notes: string | null;
+  anamnesis_snapshot: Record<string, unknown> | null;
+  // type-specific
+  vaccine_protocol: string | null;
+  vaccine_next_date: string | null;
+  vaccine_status: string | null;
+  exam_result: string | null;
+  prescription_items: unknown[] | null;
+  weight_kg: number | null;
+  pathologies: unknown[] | null;
   pet?: ApiPet;
   vet?: ApiUser;
   created_at: string;
@@ -168,13 +182,23 @@ export interface StoreMedicalEventPayload {
   pet_id: string;
   type: string;
   date: string;
+  title?: string;
   description?: string;
-  vital_signs?: string;
-  medications?: string;
-  exams?: string;
+  vital_signs?: Record<string, unknown>;
+  medications?: Record<string, unknown>;
+  exams?: Record<string, unknown>;
   diagnosis?: string;
   treatment?: string;
   notes?: string;
+  anamnesis_snapshot?: Record<string, unknown>;
+  // type-specific
+  vaccine_protocol?: string;
+  vaccine_next_date?: string;
+  vaccine_status?: string;
+  exam_result?: string;
+  prescription_items?: unknown[];
+  weight_kg?: number;
+  pathologies?: unknown[];
 }
 
 export interface StoreClientPayload {

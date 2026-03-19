@@ -17,7 +17,9 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSessionStore } from "@/stores/session";
+import { useLogoStore } from "@/stores/logo";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -34,6 +36,139 @@ const navItems = [
 interface SidebarProps {
   mobileOpen?: boolean;
   onMobileClose?: () => void;
+}
+
+function LogoDisplay({
+  collapsed,
+  isMobile,
+  onMobileClose,
+}: {
+  collapsed: boolean;
+  isMobile: boolean;
+  onMobileClose?: () => void;
+}) {
+  const { user } = useSessionStore();
+  const { getLogo } = useLogoStore();
+  const [logoLoaded, setLogoLoaded] = useState(false);
+  const [logoError, setLogoError] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Handle hydration for zustand persist
+  useEffect(() => {
+    setIsHydrated(true);
+    // Reset logo state when user changes
+    setLogoLoaded(false);
+    setLogoError(false);
+  }, [user?.id]);
+
+  const userId = user?.id ?? "";
+  const userLogoUrl = isHydrated && userId ? getLogo(userId) : null;
+  const showCustomLogo = !!userLogoUrl && !logoError;
+
+  if (!isMobile && collapsed) {
+    return (
+      <div
+        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 overflow-hidden relative"
+        style={{
+          boxShadow:
+            "0 0 0 1.5px rgba(45,198,198,0.5), 0 0 12px rgba(45,198,198,0.2)",
+        }}
+      >
+        {/* Skeleton while loading */}
+        {!isHydrated && (
+          <div className="absolute inset-0 bg-white/10 animate-pulse rounded-xl" />
+        )}
+        {isHydrated && showCustomLogo ? (
+          <>
+            {!logoLoaded && (
+              <div className="absolute inset-0 bg-white/10 animate-pulse rounded-xl" />
+            )}
+            <Image
+              src={userLogoUrl}
+              alt="Logo"
+              width={36}
+              height={36}
+              className="object-cover w-full h-full"
+              unoptimized
+              onLoad={() => setLogoLoaded(true)}
+              onError={() => setLogoError(true)}
+            />
+          </>
+        ) : isHydrated ? (
+          <Image
+            src="/images/logo.jpeg"
+            alt="DrVet"
+            width={36}
+            height={36}
+            className="object-cover"
+          />
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3 w-full">
+      <div
+        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 overflow-hidden relative"
+        style={{
+          boxShadow:
+            "0 0 0 1.5px rgba(45,198,198,0.5), 0 0 16px rgba(45,198,198,0.25)",
+        }}
+      >
+        {/* Skeleton while hydrating */}
+        {!isHydrated && (
+          <div className="absolute inset-0 bg-white/10 animate-pulse rounded-xl" />
+        )}
+        {isHydrated && showCustomLogo ? (
+          <>
+            {!logoLoaded && (
+              <div className="absolute inset-0 bg-white/10 animate-pulse rounded-xl" />
+            )}
+            <Image
+              src={userLogoUrl}
+              alt="Logo"
+              width={40}
+              height={40}
+              className="object-cover w-full h-full"
+              unoptimized
+              onLoad={() => setLogoLoaded(true)}
+              onError={() => setLogoError(true)}
+            />
+          </>
+        ) : isHydrated ? (
+          <Image
+            src="/images/logo.jpeg"
+            alt="DrVet"
+            width={40}
+            height={40}
+            className="object-cover"
+          />
+        ) : null}
+      </div>
+      <div className="min-w-0 flex-1">
+        {!isHydrated ? (
+          // Skeleton for text
+          <div className="space-y-1">
+            <div className="h-3 bg-white/10 rounded animate-pulse w-16" />
+          </div>
+        ) : (
+          <p className="font-bold text-sm leading-tight tracking-widest uppercase text-white truncate">
+            {user?.clinicName ? user.clinicName : "DrVet"}
+          </p>
+        )}
+      </div>
+      {isMobile && onMobileClose && (
+        <button
+          onClick={onMobileClose}
+          className="text-white/60 hover:text-white transition-colors ml-auto shrink-0"
+          aria-label="Fechar menu"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      )}
+    </div>
+  );
 }
 
 function SidebarContent({
@@ -78,55 +213,11 @@ function SidebarContent({
           !isMobile && collapsed ? "justify-center px-2" : "",
         )}
       >
-        {!isMobile && collapsed ? (
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
-            style={{
-              boxShadow:
-                "0 0 0 1.5px rgba(45,198,198,0.5), 0 0 12px rgba(45,198,198,0.2)",
-            }}
-          >
-            <Image
-              src="/images/logo.jpeg"
-              alt="DrVet"
-              width={36}
-              height={36}
-              className="object-cover"
-            />
-          </div>
-        ) : (
-          <div className="flex items-center gap-3 w-full">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
-              style={{
-                boxShadow:
-                  "0 0 0 1.5px rgba(45,198,198,0.5), 0 0 16px rgba(45,198,198,0.25)",
-              }}
-            >
-              <Image
-                src="/images/logo.jpeg"
-                alt="DrVet"
-                width={40}
-                height={40}
-                className="object-cover"
-              />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-bold text-sm leading-tight tracking-widest uppercase text-white">
-                DrVet
-              </p>
-            </div>
-            {isMobile && onMobileClose && (
-              <button
-                onClick={onMobileClose}
-                className="text-white/60 hover:text-white transition-colors ml-auto"
-                aria-label="Fechar menu"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            )}
-          </div>
-        )}
+        <LogoDisplay
+          collapsed={collapsed}
+          isMobile={isMobile}
+          onMobileClose={onMobileClose}
+        />
       </div>
 
       {/* Divisor com gradiente teal */}

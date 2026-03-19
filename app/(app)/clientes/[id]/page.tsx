@@ -160,9 +160,9 @@ export default function ClienteDetailPage() {
         diagnosis: eventForm.diagnosis || undefined,
         treatment: eventForm.treatment || undefined,
         notes: eventForm.notes || undefined,
-        vital_signs: eventForm.vital_signs || undefined,
-        medications: eventForm.medications || undefined,
-        exams: eventForm.exams || undefined,
+        // vital_signs, medications, exams are stored as JSON objects;
+        // these fields from the old string form are intentionally omitted here
+        // (use the pet detail page for structured anamnesis/prescription data)
       },
       {
         onSuccess: () => {
@@ -243,9 +243,6 @@ export default function ClienteDetailPage() {
       <Tabs defaultValue="pets">
         <TabsList className="w-full sm:w-auto">
           <TabsTrigger value="pets" className="flex-1 sm:flex-none">Pets ({pets.length})</TabsTrigger>
-          <TabsTrigger value="prontuario" disabled={!effectivePet} className="flex-1 sm:flex-none">
-            Prontuário
-          </TabsTrigger>
           <TabsTrigger value="info" className="flex-1 sm:flex-none">Dados do Cliente</TabsTrigger>
         </TabsList>
 
@@ -416,7 +413,7 @@ export default function ClienteDetailPage() {
                                 {event.vital_signs && (
                                   <p className="text-sm mt-1 bg-muted p-2 rounded">
                                     <strong>Sinais vitais:</strong>{" "}
-                                    {event.vital_signs}
+                                    {JSON.stringify(event.vital_signs)}
                                   </p>
                                 )}
                                 {event.diagnosis && (
@@ -434,12 +431,12 @@ export default function ClienteDetailPage() {
                                 {event.medications && (
                                   <p className="text-sm mt-1 bg-orange-50 text-orange-800 rounded px-2 py-1">
                                     <strong>Medicações:</strong>{" "}
-                                    {event.medications}
+                                    {JSON.stringify(event.medications)}
                                   </p>
                                 )}
                                 {event.exams && (
                                   <p className="text-sm mt-1 bg-purple-50 text-purple-800 rounded px-2 py-1">
-                                    <strong>Exames:</strong> {event.exams}
+                                    <strong>Exames:</strong> {JSON.stringify(event.exams)}
                                   </p>
                                 )}
                                 {event.notes && (

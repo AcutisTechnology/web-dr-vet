@@ -6,6 +6,16 @@ export type AccountType =
   | "clinic_user" // Usuário vinculado a uma clínica
   | "autonomous"; // Veterinário autônomo (sem clínica)
 
+// ─── Granular module permissions ─────────────────────────────────────────────
+export type PermissionModule =
+  | "financeiro"
+  | "pdv"
+  | "relatorios"
+  | "usuarios"
+  | "configuracoes";
+
+export type ModulePermissions = Partial<Record<PermissionModule, boolean>>;
+
 export interface User {
   id: string;
   name: string;
@@ -15,8 +25,10 @@ export interface User {
   clinicId?: string; // Referência à clínica (se clinic_owner ou clinic_user)
   clinicName?: string; // Nome da clínica (desnormalizado para exibição)
   avatar?: string;
+  logoUrl?: string; // URL da logo do usuário/clínica
   active: boolean;
   createdAt: string;
+  permissions?: ModulePermissions; // granular module access (clinic_user only)
 }
 
 // ─── Clinic / Registration ────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import type { User, AccountType, UserRole } from "@/types";
+import type { User, AccountType, UserRole, ModulePermissions } from "@/types";
 import type { ApiUser } from "@/types/api";
 
 export function adaptApiUserToUser(apiUser: ApiUser): User {
@@ -11,6 +11,8 @@ export function adaptApiUserToUser(apiUser: ApiUser): User {
     clinicId: apiUser.clinic_id ?? undefined,
     clinicName: apiUser.clinic?.name ?? undefined,
     avatar: apiUser.avatar ?? undefined,
+    logoUrl: apiUser.logo_url ?? undefined,
+    permissions: (apiUser.permissions ?? undefined) as ModulePermissions | undefined,
     active: apiUser.active,
     createdAt: apiUser.created_at,
   };

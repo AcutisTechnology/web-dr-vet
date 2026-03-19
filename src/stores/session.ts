@@ -8,6 +8,7 @@ interface SessionState {
   isAuthenticated: boolean;
   login: (user: User, token: string) => void;
   logout: () => void;
+  updateUser: (updates: Partial<User>) => void;
 }
 
 export const useSessionStore = create<SessionState>()(
@@ -18,6 +19,10 @@ export const useSessionStore = create<SessionState>()(
       isAuthenticated: false,
       login: (user, token) => set({ user, token, isAuthenticated: true }),
       logout: () => set({ user: null, token: null, isAuthenticated: false }),
+      updateUser: (updates) =>
+        set((state) =>
+          state.user ? { user: { ...state.user, ...updates } } : {},
+        ),
     }),
     { name: "vetdom-session" },
   ),
