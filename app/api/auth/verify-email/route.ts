@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 // In-memory code store — persists across requests in the same Node.js process.
 // In production with múltiplas instâncias, substituir por Redis ou banco de dados.
 const verificationCodes = new Map<string, { code: string; expiresAt: number }>();
+
+// Instanciado dentro da função para evitar erro no build do Next.js
+// (process.env não está disponível no nível do módulo durante o next build)
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY);
+}
 
 function generateCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -39,7 +43,7 @@ export async function POST(request: NextRequest) {
       const fromAddress = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
       const fromName = process.env.RESEND_FROM_NAME ?? "DrVet";
 
-      const { data, error } = await resend.emails.send({
+      const { data, error } = await getResend().emails.send({
         from: `${fromName} <${fromAddress}>`,
         to: email,
         subject: "Confirme seu e-mail – DrVet",
