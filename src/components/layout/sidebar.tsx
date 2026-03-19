@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useSessionStore } from "@/stores/session";
 import { useLogoStore } from "@/stores/logo";
+import { canAccessRoute } from "@/lib/permissions";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -183,6 +184,8 @@ function SidebarContent({
   isMobile?: boolean;
 }) {
   const pathname = usePathname();
+  const { user } = useSessionStore();
+  const visibleItems = navItems.filter((item) => canAccessRoute(user, item.href));
 
   return (
     <aside
@@ -231,7 +234,7 @@ function SidebarContent({
 
       {/* Nav */}
       <nav className="relative z-10 flex-1 px-2 py-2 overflow-y-auto space-y-1">
-        {navItems.map(({ href, label, icon: Icon }) => {
+        {visibleItems.map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href);
           return (
             <Link

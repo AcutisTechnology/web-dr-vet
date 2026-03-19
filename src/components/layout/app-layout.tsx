@@ -5,10 +5,13 @@ import { useSessionStore } from "@/stores/session";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 import { Toaster } from "@/components/ui/toaster";
+import { canAccessRoute } from "@/lib/permissions";
+import { usePathname } from "next/navigation";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useSessionStore();
+  const { isAuthenticated, user } = useSessionStore();
   const router = useRouter();
+  const pathname = usePathname();
   const [hydrated, setHydrated] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -21,6 +24,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       router.replace("/login");
     }
   }, [hydrated, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (!hydrated || !isAuthenticated) return;
+    if (!canAccessRoute(user, pathname)) {
+      router.replace("/dashboard");
+    }
+  }, [hydrated, isAuthenticated, user, pathname, router]);
 
   if (!hydrated || !isAuthenticated) return null;
 
