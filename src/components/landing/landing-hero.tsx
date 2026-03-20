@@ -39,7 +39,7 @@ export function LandingNav() {
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-white border border-gray-100 overflow-hidden flex items-center justify-center shadow-md shrink-0">
             <Image
-              src="/images/logo.jpeg"
+              src="/images/logo-fundo.png"
               alt="DrVet"
               width={36}
               height={36}
@@ -254,7 +254,7 @@ export function LandingHero() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-white border border-gray-100 overflow-hidden flex items-center justify-center shrink-0">
-                  <Image src="/images/logo.jpeg" alt="DrVet" width={32} height={32} className="object-cover" />
+                  <Image src="/images/logo-fundo.png" alt="DrVet" width={32} height={32} className="object-cover" />
                 </div>
                 <span className="font-bold text-sm">DrVet</span>
               </div>

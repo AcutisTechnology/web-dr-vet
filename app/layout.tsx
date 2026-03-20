@@ -19,11 +19,6 @@ export const metadata: Metadata = {
   title: "DrVet",
   description:
     "Sistema completo de gestão para clínicas veterinárias e veterinários autônomos.",
-  icons: {
-    icon: "/images/logo.jpeg",
-    shortcut: "/images/logo.jpeg",
-    apple: "/images/logo.jpeg",
-  },
 };
 
 export default function RootLayout({

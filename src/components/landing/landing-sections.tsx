@@ -708,7 +708,7 @@ export function LandingFooter() {
         <div className="grid md:grid-cols-3 gap-10 mb-10">
           <div>
             <div className="flex items-center gap-2.5 mb-3">
-              <img src="/images/logo.jpeg" alt="DrVet Logo" className="w-8 h-8 rounded-xl object-cover" />
+              <img src="/images/logo-fundo.png" alt="DrVet Logo" className="w-12 h-12 rounded-xl object-cover" />
               <span className="text-white font-bold text-lg">DrVet</span>
             </div>
             <p className="text-sm leading-relaxed max-w-xs">
