@@ -23,7 +23,7 @@ export function canAccessRoute(user: User | null | undefined, pathname: string):
 
   // Billing should be visible for billing owners (clinic owner and autonomous).
   if (pathname.startsWith("/assinatura")) {
-    return user.accountType === "clinic_owner" || user.accountType === "autonomous";
+    return user.accountType !== "clinic_user";
   }
 
   // All other routes remain accessible.
