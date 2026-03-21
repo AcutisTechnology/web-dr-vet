@@ -21,8 +21,10 @@ export function canAccessRoute(user: User | null | undefined, pathname: string):
   if (pathname.startsWith("/pdv")) return hasModulePermission(user, "pdv");
   if (pathname.startsWith("/usuarios")) return hasModulePermission(user, "usuarios");
 
-  // Billing should only be visible for clinic owner.
-  if (pathname.startsWith("/assinatura")) return user.accountType === "clinic_owner";
+  // Billing should be visible for billing owners (clinic owner and autonomous).
+  if (pathname.startsWith("/assinatura")) {
+    return user.accountType === "clinic_owner" || user.accountType === "autonomous";
+  }
 
   // All other routes remain accessible.
   return true;
