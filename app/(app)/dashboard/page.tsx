@@ -6,6 +6,7 @@ import {
   BedDouble,
   Clock,
   RefreshCw,
+  Syringe,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -241,7 +242,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Bottom row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -314,6 +315,56 @@ export default function DashboardPage() {
                     </Badge>
                   </div>
                 ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Syringe className="w-4 h-4 text-success" /> Alertas de Vacinas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(stats?.vaccine_due_alerts.list ?? []).length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                Nenhuma vacina próxima do vencimento
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {stats?.vaccine_due_alerts.list.map((item) => {
+                  const dueLabel =
+                    item.days_until_due < 0
+                      ? `${Math.abs(item.days_until_due)} dia(s) atrasada`
+                      : item.days_until_due === 0
+                        ? "vence hoje"
+                        : `vence em ${item.days_until_due} dia(s)`;
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between py-2 border-b last:border-0"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">
+                          {item.title ?? "Vacina"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.pet?.name ?? "Pet"}
+                          {item.client?.name ? ` · Tutor: ${item.client.name}` : ""}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Próxima: {format(parseISO(item.next_date), "dd/MM/yyyy")}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={item.days_until_due < 0 ? "destructive" : "warning"}
+                      >
+                        {dueLabel}
+                      </Badge>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </CardContent>

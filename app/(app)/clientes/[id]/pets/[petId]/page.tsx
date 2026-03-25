@@ -13,6 +13,7 @@ import {
   ClipboardList,
   BookOpen,
   FlaskConical,
+  Syringe,
   FileText,
   ExternalLink,
   Upload,
@@ -287,6 +288,44 @@ type ExamRecord = {
   attachments?: ExamAttachmentRef[];
 };
 
+const VACCINE_STATUS_OPTIONS = [
+  { value: "active", label: "Ativo" },
+  { value: "paused", label: "Pausado" },
+  { value: "completed", label: "Concluído" },
+] as const;
+
+type VaccineStatus = (typeof VACCINE_STATUS_OPTIONS)[number]["value"];
+
+type VaccineRecord = {
+  id: string;
+  name: string;
+  applied_at: string;
+  next_date?: string;
+  protocol?: string;
+  status: VaccineStatus;
+  notes?: string;
+  description?: string;
+};
+
+const normalizeVaccineStatus = (value: unknown): VaccineStatus => {
+  if (value === "paused" || value === "completed") return value;
+  return "active";
+};
+
+const mapEventToVaccineRecord = (event: ApiMedicalEvent): VaccineRecord | null => {
+  if (event.type !== "vaccine") return null;
+  return {
+    id: event.id,
+    name: (event.title ?? "Vacina").trim() || "Vacina",
+    applied_at: event.date,
+    next_date: event.vaccine_next_date ?? undefined,
+    protocol: event.vaccine_protocol ?? undefined,
+    status: normalizeVaccineStatus(event.vaccine_status),
+    notes: event.notes ?? undefined,
+    description: event.description ?? undefined,
+  };
+};
+
 const normalizeExamStatus = (value: unknown): ExamStatus => {
   if (value === "in_progress" || value === "completed") return value;
   return "requested";
@@ -435,6 +474,10 @@ export default function PetDetailPage() {
   const examRecords = events
     .map(mapEventToExamRecord)
     .filter((item): item is ExamRecord => !!item);
+  const vaccineRecords = events
+    .map(mapEventToVaccineRecord)
+    .filter((item): item is VaccineRecord => !!item)
+    .sort((a, b) => new Date(b.applied_at).getTime() - new Date(a.applied_at).getTime());
   const loading = loadingPet || loadingClient;
   const { data: apiFinanceEntries = [], isLoading: loadingFinance } = useQuery({
     queryKey: ["finance-entries", "pet", petId],
@@ -526,6 +569,18 @@ export default function PetDetailPage() {
     resultSummary: "",
     notes: "",
     attachments: [],
+  });
+  const [vaccineDrawerOpen, setVaccineDrawerOpen] = useState(false);
+  const [editingVaccineEventId, setEditingVaccineEventId] = useState<string | null>(null);
+  const [savingVaccine, setSavingVaccine] = useState(false);
+  const [vaccineForm, setVaccineForm] = useState({
+    name: "",
+    appliedAt: new Date().toISOString().split("T")[0],
+    nextDate: "",
+    protocol: "",
+    status: "active" as VaccineStatus,
+    description: "",
+    notes: "",
   });
 
   useEffect(() => {
@@ -971,6 +1026,86 @@ export default function PetDetailPage() {
       toast({ title: "Erro ao abrir PDF", variant: "destructive" });
     } finally {
       setOpeningAttachmentId(null);
+    }
+  };
+
+  const resetVaccineForm = () => {
+    setEditingVaccineEventId(null);
+    setVaccineForm({
+      name: "",
+      appliedAt: new Date().toISOString().split("T")[0],
+      nextDate: "",
+      protocol: "",
+      status: "active",
+      description: "",
+      notes: "",
+    });
+  };
+
+  const openNewVaccineDrawer = () => {
+    resetVaccineForm();
+    setVaccineDrawerOpen(true);
+  };
+
+  const openEditVaccineDrawer = (vaccine: VaccineRecord) => {
+    setEditingVaccineEventId(vaccine.id);
+    setVaccineForm({
+      name: vaccine.name,
+      appliedAt: vaccine.applied_at,
+      nextDate: vaccine.next_date ?? "",
+      protocol: vaccine.protocol ?? "",
+      status: vaccine.status,
+      description: vaccine.description ?? "",
+      notes: vaccine.notes ?? "",
+    });
+    setVaccineDrawerOpen(true);
+  };
+
+  const handleSaveVaccine = async () => {
+    if (!pet) return;
+    if (!vaccineForm.name.trim()) {
+      toast({ title: "Nome da vacina é obrigatório", variant: "destructive" });
+      return;
+    }
+    if (!vaccineForm.appliedAt) {
+      toast({ title: "Data da aplicação é obrigatória", variant: "destructive" });
+      return;
+    }
+
+    setSavingVaccine(true);
+    try {
+      const payload = {
+        type: "vaccine",
+        date: vaccineForm.appliedAt,
+        title: vaccineForm.name.trim(),
+        description: vaccineForm.description || undefined,
+        notes: vaccineForm.notes || undefined,
+        vaccine_protocol: vaccineForm.protocol || undefined,
+        vaccine_next_date: vaccineForm.nextDate || undefined,
+        vaccine_status: vaccineForm.status,
+      };
+
+      if (editingVaccineEventId) {
+        await medicalEventService.update(editingVaccineEventId, payload);
+      } else {
+        await medicalEventService.create({
+          pet_id: pet.id,
+          ...payload,
+        });
+      }
+
+      qc.invalidateQueries({ queryKey: ["medical-events", petId] });
+      setVaccineDrawerOpen(false);
+      resetVaccineForm();
+      toast({
+        title: editingVaccineEventId
+          ? "Vacina atualizada com sucesso"
+          : "Vacina registrada com sucesso",
+      });
+    } catch {
+      toast({ title: "Erro ao salvar vacina", variant: "destructive" });
+    } finally {
+      setSavingVaccine(false);
     }
   };
 
@@ -1553,6 +1688,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
           { value: "ambiente", label: "Rotina e Alimentação" },
           { value: "preventivos", label: "Preventivos" },
           { value: "obs", label: "Comportamento" },
+          { value: "vacinas", label: `Vacinas (${vaccineRecords.length})` },
           { value: "exames", label: `Exames (${examRecords.length})` },
           { value: "ia", label: "✨ Diagnóstico IA" },
           { value: "receituario", label: "Receituário" },
@@ -2840,6 +2976,252 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                 {saving ? "Salvando..." : "Salvar"}
               </Button>
             </div>
+          </TabsContent>
+
+          {/* VACINAS */}
+          <TabsContent value="vacinas">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <p className="font-medium text-sm">
+                  Vacinação de <span className="text-primary font-semibold">{pet.name}</span>
+                </p>
+                <Button size="sm" onClick={openNewVaccineDrawer}>
+                  <Syringe className="w-4 h-4 mr-1" />
+                  Nova vacina
+                </Button>
+              </div>
+
+              {vaccineRecords.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center text-muted-foreground space-y-2">
+                    <Syringe className="w-10 h-10 mx-auto opacity-20" />
+                    <p>Nenhuma vacina registrada para este pet.</p>
+                    <p className="text-xs">
+                      Registre as aplicações para gerar alertas automáticos no dashboard.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {vaccineRecords.map((vaccine) => {
+                    const statusLabel =
+                      VACCINE_STATUS_OPTIONS.find((s) => s.value === vaccine.status)
+                        ?.label ?? "Ativo";
+                    const statusClass =
+                      vaccine.status === "completed"
+                        ? "bg-success/12 text-success"
+                        : vaccine.status === "paused"
+                          ? "bg-warning/12 text-[color:var(--warning)]"
+                          : "bg-info/12 text-info";
+
+                    const daysUntilNext = vaccine.next_date
+                      ? Math.ceil(
+                          (new Date(vaccine.next_date).getTime() -
+                            new Date(new Date().toISOString().split("T")[0]).getTime()) /
+                            (1000 * 60 * 60 * 24),
+                        )
+                      : null;
+
+                    return (
+                      <Card key={vaccine.id}>
+                        <CardContent className="p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-2 flex-wrap">
+                            <div className="space-y-1">
+                              <p className="font-semibold text-sm">{vaccine.name}</p>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${statusClass}`}>
+                                  {statusLabel}
+                                </span>
+                                {vaccine.protocol && (
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
+                                    {vaccine.protocol}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openEditVaccineDrawer(vaccine)}
+                            >
+                              <Edit className="w-4 h-4 mr-1" />
+                              Editar
+                            </Button>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Aplicada em</p>
+                              <p className="text-sm font-medium">{formatDate(vaccine.applied_at)}</p>
+                            </div>
+                            {vaccine.next_date && (
+                              <div>
+                                <p className="text-xs text-muted-foreground">Próxima dose</p>
+                                <p className="text-sm font-medium">{formatDate(vaccine.next_date)}</p>
+                                {daysUntilNext !== null && (
+                                  <p
+                                    className={`text-xs mt-0.5 ${
+                                      daysUntilNext < 0
+                                        ? "text-destructive"
+                                        : daysUntilNext <= 7
+                                          ? "text-[color:var(--warning)]"
+                                          : "text-muted-foreground"
+                                    }`}
+                                  >
+                                    {daysUntilNext < 0
+                                      ? `${Math.abs(daysUntilNext)} dia(s) em atraso`
+                                      : daysUntilNext === 0
+                                        ? "Vence hoje"
+                                        : `Vence em ${daysUntilNext} dia(s)`}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {vaccine.description && (
+                            <p className="text-sm">{vaccine.description}</p>
+                          )}
+
+                          {vaccine.notes && (
+                            <p className="text-sm text-muted-foreground">{vaccine.notes}</p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <Drawer
+              open={vaccineDrawerOpen}
+              onOpenChange={(open) => {
+                setVaccineDrawerOpen(open);
+                if (!open) resetVaccineForm();
+              }}
+            >
+              <DrawerContent className="max-h-[90vh]">
+                <DrawerHeader className="border-b pb-3">
+                  <DrawerTitle>
+                    {editingVaccineEventId ? "Editar vacina" : "Nova vacina"}
+                  </DrawerTitle>
+                </DrawerHeader>
+
+                <div className="overflow-y-auto flex-1 px-4 pb-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <Label>Nome da vacina *</Label>
+                      <Input
+                        value={vaccineForm.name}
+                        onChange={(e) =>
+                          setVaccineForm((prev) => ({ ...prev, name: e.target.value }))
+                        }
+                        placeholder="Ex: V10"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label>Data da aplicação *</Label>
+                      <Input
+                        type="date"
+                        value={vaccineForm.appliedAt}
+                        onChange={(e) =>
+                          setVaccineForm((prev) => ({ ...prev, appliedAt: e.target.value }))
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label>Próxima dose</Label>
+                      <Input
+                        type="date"
+                        value={vaccineForm.nextDate}
+                        onChange={(e) =>
+                          setVaccineForm((prev) => ({ ...prev, nextDate: e.target.value }))
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label>Protocolo</Label>
+                      <Input
+                        value={vaccineForm.protocol}
+                        onChange={(e) =>
+                          setVaccineForm((prev) => ({ ...prev, protocol: e.target.value }))
+                        }
+                        placeholder="Ex: Reforço anual"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label>Status</Label>
+                      <Select
+                        value={vaccineForm.status}
+                        onValueChange={(v) =>
+                          setVaccineForm((prev) => ({
+                            ...prev,
+                            status: v as VaccineStatus,
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {VACCINE_STATUS_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <Label>Descrição</Label>
+                      <Textarea
+                        rows={2}
+                        value={vaccineForm.description}
+                        onChange={(e) =>
+                          setVaccineForm((prev) => ({
+                            ...prev,
+                            description: e.target.value,
+                          }))
+                        }
+                        placeholder="Descrição da aplicação"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <Label>Observações</Label>
+                      <Textarea
+                        rows={3}
+                        value={vaccineForm.notes}
+                        onChange={(e) =>
+                          setVaccineForm((prev) => ({ ...prev, notes: e.target.value }))
+                        }
+                        placeholder="Lote, fabricante, reações, etc."
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <DrawerFooter className="border-t">
+                  <Button variant="outline" onClick={() => setVaccineDrawerOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleSaveVaccine} disabled={savingVaccine}>
+                    {savingVaccine
+                      ? "Salvando..."
+                      : editingVaccineEventId
+                        ? "Atualizar vacina"
+                        : "Salvar vacina"}
+                  </Button>
+                </DrawerFooter>
+              </DrawerContent>
+            </Drawer>
           </TabsContent>
 
           {/* EXAMES */}

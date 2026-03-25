@@ -340,6 +340,19 @@ export interface ApiDashboardStats {
   weekly_sales: Array<{ date: string; total: number; count: number }>;
   weekly_appointments: Array<{ date: string; count: number }>;
   services_breakdown: Array<{ name: string; value: number }>;
+  vaccine_due_alerts: {
+    total: number;
+    list: Array<{
+      id: string;
+      title: string | null;
+      pet: { id: string; name: string } | null;
+      client: { id: string; name: string } | null;
+      next_date: string;
+      days_until_due: number;
+      protocol: string | null;
+      status: string | null;
+    }>;
+  };
 }
 
 export interface ApiBox {
