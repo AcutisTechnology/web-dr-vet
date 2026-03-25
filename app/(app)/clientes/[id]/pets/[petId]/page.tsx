@@ -12,6 +12,10 @@ import {
   XCircle,
   ClipboardList,
   BookOpen,
+  FlaskConical,
+  FileText,
+  ExternalLink,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +39,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerFooter,
+} from "@/components/ui/drawer";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { VerticalTabs } from "@/components/ui/vertical-tabs";
 import { AiDiagnosisTab } from "@/components/pet/ai-diagnosis-tab";
@@ -238,6 +249,126 @@ const EVT_LBL: Record<string, string> = {
   surgery: "Cirurgia",
   return: "Retorno",
 };
+
+const EXAM_STATUS_OPTIONS = [
+  { value: "requested", label: "Solicitado" },
+  { value: "in_progress", label: "Em processamento" },
+  { value: "completed", label: "Concluído" },
+] as const;
+
+type ExamStatus = (typeof EXAM_STATUS_OPTIONS)[number]["value"];
+
+const EXAM_KIND_OPTIONS = [
+  { value: "laboratorial", label: "Laboratorial" },
+  { value: "imagem", label: "Imagem" },
+  { value: "cardiologico", label: "Cardiológico" },
+  { value: "outro", label: "Outro" },
+] as const;
+
+type ExamKind = (typeof EXAM_KIND_OPTIONS)[number]["value"];
+
+type ExamAttachmentRef = {
+  id: string;
+  name: string;
+  size?: number;
+  mime_type?: string;
+};
+
+type ExamRecord = {
+  id: string;
+  name: string;
+  kind: ExamKind;
+  status: ExamStatus;
+  requested_at: string;
+  collected_at?: string;
+  result_at?: string;
+  result_summary?: string;
+  notes?: string;
+  attachments?: ExamAttachmentRef[];
+};
+
+const normalizeExamStatus = (value: unknown): ExamStatus => {
+  if (value === "in_progress" || value === "completed") return value;
+  return "requested";
+};
+
+const normalizeExamKind = (value: unknown): ExamKind => {
+  if (
+    value === "laboratorial" ||
+    value === "imagem" ||
+    value === "cardiologico" ||
+    value === "outro"
+  ) {
+    return value;
+  }
+  return "outro";
+};
+
+const mapEventToExamRecord = (event: ApiMedicalEvent): ExamRecord | null => {
+  if (event.type !== "exam") return null;
+
+  const examPayload = (event.exams ?? {}) as Record<string, unknown>;
+  const attachmentsRaw = Array.isArray(examPayload.attachments)
+    ? examPayload.attachments
+    : [];
+  const normalizedAttachments: ExamAttachmentRef[] = attachmentsRaw.reduce<ExamAttachmentRef[]>(
+    (acc, item) => {
+      if (!item || typeof item !== "object") return acc;
+      const candidate = item as Record<string, unknown>;
+      const id = typeof candidate.id === "string" ? candidate.id : "";
+      if (!id) return acc;
+      acc.push({
+        id,
+        name: typeof candidate.name === "string" ? candidate.name : "Arquivo",
+        size: typeof candidate.size === "number" ? candidate.size : undefined,
+        mime_type: typeof candidate.mime_type === "string" ? candidate.mime_type : undefined,
+      });
+      return acc;
+    },
+    [],
+  );
+
+  const title = (event.title ?? "").trim();
+  const fallbackName = title || "Exame";
+
+  return {
+    id: event.id,
+    name:
+      typeof examPayload.name === "string" && examPayload.name.trim()
+        ? examPayload.name.trim()
+        : fallbackName,
+    kind: normalizeExamKind(examPayload.kind),
+    status: normalizeExamStatus(examPayload.status),
+    requested_at:
+      typeof examPayload.requested_at === "string" && examPayload.requested_at
+        ? examPayload.requested_at
+        : event.date,
+    collected_at:
+      typeof examPayload.collected_at === "string" && examPayload.collected_at
+        ? examPayload.collected_at
+        : undefined,
+    result_at:
+      typeof examPayload.result_at === "string" && examPayload.result_at
+        ? examPayload.result_at
+        : undefined,
+    result_summary:
+      event.exam_result ??
+      (typeof examPayload.result_summary === "string" ? examPayload.result_summary : undefined),
+    notes:
+      event.notes ?? (typeof examPayload.notes === "string" ? examPayload.notes : undefined),
+    attachments:
+      normalizedAttachments.length > 0
+        ? normalizedAttachments
+        : (event.media_files ?? [])
+            .map((m) => ({
+              id: m.id,
+              name: m.name ?? "Arquivo",
+              size: m.size,
+              mime_type: m.mime_type,
+            }))
+            .filter((m) => !!m.id),
+  };
+};
 const EVT_CLR: Record<string, string> = {
   consultation: "bg-info/12 text-info",
   vaccine: "bg-success/12 text-success",
@@ -301,6 +432,9 @@ export default function PetDetailPage() {
     enabled: !!petId,
   });
   const events = apiEvents as ApiMedicalEvent[];
+  const examRecords = events
+    .map(mapEventToExamRecord)
+    .filter((item): item is ExamRecord => !!item);
   const loading = loadingPet || loadingClient;
   const { data: apiFinanceEntries = [], isLoading: loadingFinance } = useQuery({
     queryKey: ["finance-entries", "pet", petId],
@@ -366,6 +500,32 @@ export default function PetDetailPage() {
       },
     ],
     rxNotes: "",
+  });
+  const [examDialogOpen, setExamDialogOpen] = useState(false);
+  const [editingExamEventId, setEditingExamEventId] = useState<string | null>(null);
+  const [savingExam, setSavingExam] = useState(false);
+  const [examFiles, setExamFiles] = useState<File[]>([]);
+  const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
+  const [examForm, setExamForm] = useState<{
+    name: string;
+    kind: ExamKind;
+    status: ExamStatus;
+    requestedAt: string;
+    collectedAt: string;
+    resultAt: string;
+    resultSummary: string;
+    notes: string;
+    attachments: ExamAttachmentRef[];
+  }>({
+    name: "",
+    kind: "laboratorial",
+    status: "requested",
+    requestedAt: new Date().toISOString().split("T")[0],
+    collectedAt: "",
+    resultAt: "",
+    resultSummary: "",
+    notes: "",
+    attachments: [],
   });
 
   useEffect(() => {
@@ -687,6 +847,133 @@ export default function PetDetailPage() {
       setSavingSnapshot(false);
     }
   };
+
+  const formatFileSize = (size?: number) => {
+    if (!size || size <= 0) return "-";
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const resetExamForm = () => {
+    setEditingExamEventId(null);
+    setExamFiles([]);
+    setExamForm({
+      name: "",
+      kind: "laboratorial",
+      status: "requested",
+      requestedAt: new Date().toISOString().split("T")[0],
+      collectedAt: "",
+      resultAt: "",
+      resultSummary: "",
+      notes: "",
+      attachments: [],
+    });
+  };
+
+  const openNewExamDialog = () => {
+    resetExamForm();
+    setExamDialogOpen(true);
+  };
+
+  const openEditExamDialog = (exam: ExamRecord) => {
+    setEditingExamEventId(exam.id);
+    setExamFiles([]);
+    setExamForm({
+      name: exam.name,
+      kind: exam.kind,
+      status: exam.status,
+      requestedAt: exam.requested_at || new Date().toISOString().split("T")[0],
+      collectedAt: exam.collected_at ?? "",
+      resultAt: exam.result_at ?? "",
+      resultSummary: exam.result_summary ?? "",
+      notes: exam.notes ?? "",
+      attachments: exam.attachments ?? [],
+    });
+    setExamDialogOpen(true);
+  };
+
+  const handleSaveExam = async () => {
+    if (!pet) return;
+    if (!examForm.name.trim()) {
+      toast({ title: "Nome do exame é obrigatório", variant: "destructive" });
+      return;
+    }
+
+    setSavingExam(true);
+    try {
+      const examsPayload = {
+        name: examForm.name.trim(),
+        kind: examForm.kind,
+        status: examForm.status,
+        requested_at: examForm.requestedAt,
+        collected_at: examForm.collectedAt || undefined,
+        result_at: examForm.resultAt || undefined,
+        result_summary: examForm.resultSummary || undefined,
+        notes: examForm.notes || undefined,
+        attachments: examForm.attachments,
+      };
+
+      const basePayload = {
+        type: "exam",
+        date: examForm.requestedAt,
+        title: examForm.name.trim(),
+        description: `Exame ${EXAM_KIND_OPTIONS.find((o) => o.value === examForm.kind)?.label.toLowerCase() ?? "clínico"}`,
+        exam_result: examForm.resultSummary || undefined,
+        notes: examForm.notes || undefined,
+        exams: examsPayload,
+      };
+
+      const savedEvent = editingExamEventId
+        ? await medicalEventService.update(editingExamEventId, basePayload)
+        : await medicalEventService.create({
+            pet_id: pet.id,
+            ...basePayload,
+          });
+
+      const uploadedAttachments: ExamAttachmentRef[] = [];
+      for (const file of examFiles) {
+        const uploaded = await medicalEventService.uploadAttachment(savedEvent.id, file);
+        uploadedAttachments.push({
+          id: uploaded.id,
+          name: uploaded.name,
+          size: uploaded.size,
+          mime_type: uploaded.mime_type,
+        });
+      }
+
+      if (uploadedAttachments.length > 0) {
+        await medicalEventService.update(savedEvent.id, {
+          exams: {
+            ...examsPayload,
+            attachments: [...examForm.attachments, ...uploadedAttachments],
+          },
+        });
+      }
+
+      qc.invalidateQueries({ queryKey: ["medical-events", petId] });
+      setExamDialogOpen(false);
+      resetExamForm();
+      toast({ title: editingExamEventId ? "Exame atualizado com sucesso" : "Exame criado com sucesso" });
+    } catch {
+      toast({ title: "Erro ao salvar exame", variant: "destructive" });
+    } finally {
+      setSavingExam(false);
+    }
+  };
+
+  const handleOpenAttachment = async (eventId: string, attachment: ExamAttachmentRef) => {
+    setOpeningAttachmentId(attachment.id);
+    try {
+      const signed = await medicalEventService.getAttachmentSignedUrl(eventId, attachment.id);
+      window.open(signed.url, "_blank", "noopener,noreferrer");
+    } catch {
+      toast({ title: "Erro ao abrir PDF", variant: "destructive" });
+    } finally {
+      setOpeningAttachmentId(null);
+    }
+  };
+
   const handleMarkDeceased = () => {
     if (!pet || !confirm(`Marcar ${pet.name} como falecido?`)) return;
     updatePetMutation.mutate({ status: "deceased" });
@@ -1266,6 +1553,7 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
           { value: "ambiente", label: "Rotina e Alimentação" },
           { value: "preventivos", label: "Preventivos" },
           { value: "obs", label: "Comportamento" },
+          { value: "exames", label: `Exames (${examRecords.length})` },
           { value: "ia", label: "✨ Diagnóstico IA" },
           { value: "receituario", label: "Receituário" },
           { value: "prontuario", label: `Prontuário (${events.length})` },
@@ -2553,6 +2841,318 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
               </Button>
             </div>
           </TabsContent>
+
+          {/* EXAMES */}
+          <TabsContent value="exames">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <p className="font-medium text-sm">
+                  Exames clínicos de <span className="text-primary font-semibold">{pet.name}</span>
+                </p>
+                <Button size="sm" onClick={openNewExamDialog}>
+                  <FlaskConical className="w-4 h-4 mr-1" />
+                  Novo exame
+                </Button>
+              </div>
+
+              {examRecords.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center text-muted-foreground space-y-2">
+                    <FlaskConical className="w-10 h-10 mx-auto opacity-20" />
+                    <p>Nenhum exame registrado para este pet.</p>
+                    <p className="text-xs">Cadastre exames e anexe PDFs para manter o prontuário completo.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {examRecords.map((exam) => {
+                    const kindLabel = EXAM_KIND_OPTIONS.find((k) => k.value === exam.kind)?.label ?? "Outro";
+                    const statusLabel = EXAM_STATUS_OPTIONS.find((s) => s.value === exam.status)?.label ?? "Solicitado";
+                    const statusClass =
+                      exam.status === "completed"
+                        ? "bg-success/12 text-success"
+                        : exam.status === "in_progress"
+                          ? "bg-warning/12 text-[color:var(--warning)]"
+                          : "bg-info/12 text-info";
+
+                    return (
+                      <Card key={exam.id}>
+                        <CardContent className="p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-2 flex-wrap">
+                            <div className="space-y-1">
+                              <p className="font-semibold text-sm">{exam.name}</p>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
+                                  {kindLabel}
+                                </span>
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${statusClass}`}>
+                                  {statusLabel}
+                                </span>
+                              </div>
+                            </div>
+
+                            <Button variant="outline" size="sm" onClick={() => openEditExamDialog(exam)}>
+                              <Edit className="w-4 h-4 mr-1" />
+                              Editar
+                            </Button>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Solicitado em</p>
+                              <p className="text-sm font-medium">{formatDate(exam.requested_at)}</p>
+                            </div>
+                            {exam.collected_at && (
+                              <div>
+                                <p className="text-xs text-muted-foreground">Coleta</p>
+                                <p className="text-sm font-medium">{formatDate(exam.collected_at)}</p>
+                              </div>
+                            )}
+                            {exam.result_at && (
+                              <div>
+                                <p className="text-xs text-muted-foreground">Resultado</p>
+                                <p className="text-sm font-medium">{formatDate(exam.result_at)}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {exam.result_summary && (
+                            <div className="rounded-md border border-border bg-muted/40 p-3">
+                              <p className="text-xs text-muted-foreground mb-1">Resultado resumido</p>
+                              <p className="text-sm">{exam.result_summary}</p>
+                            </div>
+                          )}
+
+                          {exam.notes && (
+                            <p className="text-sm text-muted-foreground">{exam.notes}</p>
+                          )}
+
+                          {(exam.attachments ?? []).length > 0 && (
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                PDFs anexados
+                              </p>
+                              <div className="space-y-2">
+                                {(exam.attachments ?? []).map((attachment) => (
+                                  <div
+                                    key={attachment.id}
+                                    className="flex items-center justify-between gap-2 rounded-md border border-border p-2"
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium truncate">{attachment.name}</p>
+                                      <p className="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</p>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleOpenAttachment(exam.id, attachment)}
+                                      disabled={openingAttachmentId === attachment.id}
+                                    >
+                                      <ExternalLink className="w-4 h-4 mr-1" />
+                                      {openingAttachmentId === attachment.id ? "Abrindo..." : "Abrir PDF"}
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <Drawer
+              open={examDialogOpen}
+              onOpenChange={(open) => {
+                setExamDialogOpen(open);
+                if (!open) resetExamForm();
+              }}
+            >
+              <DrawerContent className="max-h-[90vh]">
+                <DrawerHeader className="border-b pb-3">
+                  <DrawerTitle>
+                    {editingExamEventId ? "Editar exame" : "Novo exame"}
+                  </DrawerTitle>
+                </DrawerHeader>
+
+                <div className="overflow-y-auto flex-1 px-4 pb-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <Label>Nome do exame *</Label>
+                    <Input
+                      value={examForm.name}
+                      onChange={(e) => setExamForm((prev) => ({ ...prev, name: e.target.value }))}
+                      placeholder="Ex: Hemograma completo"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Tipo</Label>
+                    <Select
+                      value={examForm.kind}
+                      onValueChange={(v) =>
+                        setExamForm((prev) => ({ ...prev, kind: v as ExamKind }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EXAM_KIND_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Status</Label>
+                    <Select
+                      value={examForm.status}
+                      onValueChange={(v) =>
+                        setExamForm((prev) => ({ ...prev, status: v as ExamStatus }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EXAM_STATUS_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Data solicitação</Label>
+                    <Input
+                      type="date"
+                      value={examForm.requestedAt}
+                      onChange={(e) => setExamForm((prev) => ({ ...prev, requestedAt: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Data coleta</Label>
+                    <Input
+                      type="date"
+                      value={examForm.collectedAt}
+                      onChange={(e) => setExamForm((prev) => ({ ...prev, collectedAt: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label>Data resultado</Label>
+                    <Input
+                      type="date"
+                      value={examForm.resultAt}
+                      onChange={(e) => setExamForm((prev) => ({ ...prev, resultAt: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <Label>Resumo do resultado</Label>
+                    <Textarea
+                      rows={3}
+                      value={examForm.resultSummary}
+                      onChange={(e) => setExamForm((prev) => ({ ...prev, resultSummary: e.target.value }))}
+                      placeholder="Resultado principal do exame"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <Label>Observações</Label>
+                    <Textarea
+                      rows={3}
+                      value={examForm.notes}
+                      onChange={(e) => setExamForm((prev) => ({ ...prev, notes: e.target.value }))}
+                      placeholder="Observações clínicas complementares"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <Label>Anexar PDFs</Label>
+                    <Input
+                      type="file"
+                      accept="application/pdf"
+                      multiple
+                      onChange={(e) => {
+                        const selected = Array.from(e.target.files ?? []);
+                        setExamFiles(selected);
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Formato aceito: PDF (máx. 15 MB por arquivo).
+                    </p>
+                  </div>
+
+                  {(examForm.attachments.length > 0 || examFiles.length > 0) && (
+                    <div className="sm:col-span-2 space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Arquivos deste exame
+                      </p>
+
+                      {examForm.attachments.length > 0 &&
+                        examForm.attachments.map((attachment) => (
+                          <div
+                            key={attachment.id}
+                            className="flex items-center justify-between rounded-md border border-border p-2"
+                          >
+                            <div>
+                              <p className="text-sm font-medium">{attachment.name}</p>
+                              <p className="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                editingExamEventId && handleOpenAttachment(editingExamEventId, attachment)
+                              }
+                              disabled={!editingExamEventId || openingAttachmentId === attachment.id}
+                            >
+                              <FileText className="w-4 h-4 mr-1" />
+                              Abrir
+                            </Button>
+                          </div>
+                        ))}
+
+                      {examFiles.map((file) => (
+                        <div
+                          key={file.name + file.size}
+                          className="flex items-center justify-between rounded-md border border-border bg-muted/30 p-2"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{file.name}</p>
+                            <p className="text-xs text-muted-foreground">{formatFileSize(file.size)} · pendente</p>
+                          </div>
+                          <Upload className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                </div>
+
+                <DrawerFooter className="border-t">
+                  <Button variant="outline" onClick={() => setExamDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleSaveExam} disabled={savingExam}>
+                    {savingExam ? "Salvando..." : editingExamEventId ? "Atualizar exame" : "Salvar exame"}
+                  </Button>
+                </DrawerFooter>
+              </DrawerContent>
+            </Drawer>
+          </TabsContent>
+
           {/* PRONTUÁRIO */}
           <TabsContent value="prontuario">
             <div className="space-y-4">
@@ -2680,6 +3280,47 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                                     }
                                     return (
                                       <>
+                                        {event.type === "exam" && (() => {
+                                          const exam = mapEventToExamRecord(event);
+                                          if (!exam) return null;
+                                          return (
+                                            <div className="mt-2 space-y-1.5">
+                                              <p className="text-sm">
+                                                <strong>Tipo:</strong>{" "}
+                                                {EXAM_KIND_OPTIONS.find((o) => o.value === exam.kind)?.label ?? "Outro"}
+                                              </p>
+                                              <p className="text-sm">
+                                                <strong>Status:</strong>{" "}
+                                                {EXAM_STATUS_OPTIONS.find((o) => o.value === exam.status)?.label ?? "Solicitado"}
+                                              </p>
+                                              {exam.result_summary && (
+                                                <p className="text-sm">
+                                                  <strong>Resultado:</strong> {exam.result_summary}
+                                                </p>
+                                              )}
+                                              {(exam.attachments ?? []).length > 0 && (
+                                                <div className="space-y-1">
+                                                  <p className="text-xs text-muted-foreground">PDFs anexados</p>
+                                                  <div className="flex flex-wrap gap-1.5">
+                                                    {(exam.attachments ?? []).map((attachment) => (
+                                                      <Button
+                                                        key={attachment.id}
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-7 text-xs"
+                                                        onClick={() => handleOpenAttachment(event.id, attachment)}
+                                                        disabled={openingAttachmentId === attachment.id}
+                                                      >
+                                                        <FileText className="w-3.5 h-3.5 mr-1" />
+                                                        {openingAttachmentId === attachment.id ? "Abrindo..." : "PDF"}
+                                                      </Button>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        })()}
                                         {event.description && (
                                           <p className="text-sm mt-2 text-gray-700">{event.description}</p>
                                         )}

@@ -122,6 +122,8 @@ export interface ApiMediaFile {
   id: string;
   name: string;
   url: string;
+  path?: string;
+  filename?: string;
   size: number;
   mime_type: string;
   created_at: string;
@@ -172,6 +174,7 @@ export interface ApiMedicalEvent {
   prescription_items: unknown[] | null;
   weight_kg: number | null;
   pathologies: unknown[] | null;
+  media_files?: ApiMediaFile[];
   pet?: ApiPet;
   vet?: ApiUser;
   created_at: string;
