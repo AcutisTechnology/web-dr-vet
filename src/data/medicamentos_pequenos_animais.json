@@ -1,0 +1,397 @@
+{
+  "metadata": {
+    "fonte": "Catálogo interno DrVet",
+    "data_coleta": "2026-03-28",
+    "metodo": "Apify Playwright Scraper + Proxy Residencial",
+    "datasets_apify": {
+      "dataset1_id": "YDCAupx8wgiy2UU2Y",
+      "dataset2_id": "6f5UN60stW3c5zsmw",
+      "download_url_1": "https://api.apify.com/v2/datasets/YDCAupx8wgiy2UU2Y/items?format=json",
+      "download_url_2": "https://api.apify.com/v2/datasets/6f5UN60stW3c5zsmw/items?format=json",
+      "nota": "Os datasets Apify ficam disponíveis por 7 dias. Baixe os dados completos (~86-141 itens) usando os links acima."
+    },
+    "total_coletado": 86,
+    "nota_cobertura": "Coleta parcial (jobs interrompidos por limite de créditos). Cobre primeiros produtos em ordem alfabética (4-Ac). Para dados completos, baixe via links Apify acima.",
+    "amostra_incluida_neste_arquivo": 15
+  },
+  "medicamentos": [
+    {
+      "id": "2616",
+      "slug": "4dx-plus",
+      "url": "https://vetsmart.com.br/cg/produto/2616/4dx-plus",
+      "nome": "4Dx® Plus",
+      "empresa": "IDEXX",
+      "classificacao": "Teste Diagnóstico",
+      "especies": "Cães",
+      "descricao": "Teste rápido para diagnóstico de doenças transmitidas por vetores: Anaplasma, Dirofilaria, Doença de Lyme e Ehrlichia.",
+      "principiosAtivos": [],
+      "bulario": {
+        "receita": "Receita Simples",
+        "armazenamento": "2 - 8 ºC",
+        "descritivo": "Os testes rápidos SNAP utilizam tecnologia IDEXX ELISA, fornecendo em minutos análises de alta precisão equivalentes às realizadas em laboratório de referência.",
+        "apresentacoes": "- 4Dx® Plus, caixa (5 un) - 4Dx® Plus, caixa (30 un)",
+        "indicacoes": "DOENÇAS TRANSMITIDAS POR VETORES: Anaplasma phagocytophilum, Anaplasma platys, Dirofilaria immitis, Borrelia burgdorferi (Doença de Lyme), Ehrlichia canis, Ehrlichia ewingii"
+      },
+      "interacoes": [],
+      "dosagens": []
+    },
+    {
+      "id": "6928",
+      "slug": "acqua-limp",
+      "url": "https://vetsmart.com.br/cg/produto/6928/acqua-limp",
+      "nome": "ACQUA Limp",
+      "empresa": "BIOFARM",
+      "linhaComercial": "MEDICAMENTOS",
+      "classificacao": "Oftálmico",
+      "especies": "Cães e Gatos",
+      "descricao": "Solução oftálmica com pH neutro e propriedade lubrificante ocular. Alivia irritação, ardor e secura ocular. Indicado para higienização e limpeza de secreções oculares antes da aplicação do colírio terapêutico.",
+      "principiosAtivos": ["Álcool polivinílico", "Citrato de sódio", "Cloreto de Sódio"],
+      "bulario": {
+        "receita": "Receita Simples",
+        "composicao": "Cada 100 ml contém: Álcool polivinílico 1,400 g | Citrato de sódio 0,400g | Cloreto de sódio 0,250g | Veículo q.s.p. 100,0mL",
+        "armazenamento": "Conservar em local seco e fresco, entre 15 a 30ºC, ao abrigo da luz solar.",
+        "registroMapa": "Produto isento de registro no MAPA.",
+        "responsavelTecnico": "Dr. Naur Bellusci Filho - CRMV-SP nº 6516",
+        "apresentacoes": "- ACQUA Limp, Frasco (15 ml)",
+        "indicacoes": "Solução oftálmica para alívio de irritação, ardor e secura ocular. Remoção de sujidades e limpeza de secreções oculares antes da aplicação do colírio terapêutico.",
+        "contraindicacoes": "Não deve ser utilizado em animais com hipersensibilidade comprovada aos componentes da fórmula. Evitar contato do conta-gotas com os olhos do animal.",
+        "vias": ["Oftálmica"],
+        "frequenciaUtilizacao": "4 vezes ao dia ou a critério do Médico Veterinário.",
+        "duracaoTratamento": "A critério do Médico Veterinário.",
+        "modoUsar": "Instilar sobre a superfície ocular de 1 a 2 gotas, 4 vezes ao dia ou a critério do Médico Veterinário."
+      },
+      "interacoes": [],
+      "dosagens": [{"especie": "Cães e Gatos", "dose": "3-4 gotas / animal", "subgrupo": "Recomendado"}]
+    },
+    {
+      "id": "7395",
+      "slug": "an2go-adulto-sabor-carne-bovina",
+      "url": "https://vetsmart.com.br/cg/produto/7395/an2go-adulto-sabor-carne-bovina",
+      "nome": "AN2Go Adulto sabor carne bovina",
+      "empresa": "WOW PET FOOD",
+      "classificacao": "Petisco Mastigável Natural",
+      "especies": "Cães",
+      "descricao": "AN2Go é uma refeição completa em formato de bolinhas, pronta para servir e pode ser armazenada em temperatura ambiente.",
+      "principiosAtivos": [],
+      "bulario": {
+        "descritivo": "AN2Go é uma refeição completa em formato de bolinhas que pode ser servida em qualquer ocasião. Além de servir como Alimentação Natural completa, também pode ser servida como agrado e petisco.",
+        "composicao": "Carne bovina magra, fígado bovino, batata-doce, batata inglesa, brócolis, cenoura, vagem, maçã, farinha de gergelim, farinha de côco, farinha de girassol, sal comum, enriquecido com vitaminas, minerais, aminoácidos e tocoferol.",
+        "niveisGarantia": "Umidade (máx.) 125 g/kg | Proteína Bruta (mín.) 280 g/kg | Extrato Etéreo (mín.) 55 g/kg | Fibra bruta (máx.) 140 g/kg | Cálcio (máx.) 9.000 mg/kg | Fósforo (máx.) 6.000 mg/kg",
+        "armazenamento": "Guardar em local seco, arejado e com temperatura inferior a 30ºC"
+      },
+      "interacoes": [],
+      "dosagens": []
+    },
+    {
+      "id": "7396",
+      "slug": "an2go-senior-sabor-carne-bovina",
+      "url": "https://vetsmart.com.br/cg/produto/7396/an2go-senior-sabor-carne-bovina",
+      "nome": "AN2Go Sênior sabor carne bovina",
+      "empresa": "WOW PET FOOD",
+      "classificacao": "Petisco Mastigável Natural",
+      "especies": "Cães",
+      "descricao": "AN2Go Sênior é uma refeição completa em formato de bolinhas para cães sênior.",
+      "principiosAtivos": [],
+      "bulario": {
+        "composicao": "Carne bovina magra, fígado bovino, batata-doce, batata inglesa, brócolis, cenoura, vagem, maçã, farinha de gergelim, farinha de côco, farinha de girassol, sal comum, enriquecido com vitaminas, minerais, aminoácidos e tocoferol.",
+        "niveisGarantia": "Umidade (máx.) 125 g/kg | Proteína Bruta (mín.) 280 g/kg | Extrato Etéreo (mín.) 55 g/kg | Fibra bruta (máx.) 140 g/kg",
+        "armazenamento": "Guardar em local seco, arejado e com temperatura inferior a 30ºC"
+      },
+      "interacoes": [],
+      "dosagens": []
+    },
+    {
+      "id": "476",
+      "slug": "acalmin",
+      "url": "https://vetsmart.com.br/cg/produto/476/acalmin",
+      "nome": "Acalmin",
+      "empresa": "BRAVET",
+      "classificacao": "Analgésico",
+      "especies": "Cães e Gatos",
+      "descricao": "Pomada antiflogística e sedativa para todas as espécies animais. Indicada nos estados inflamatórios em geral, dores e inchações das juntas. Alivia a dor nos reumatismos, artrites, contusões, machucados e luxações.",
+      "principiosAtivos": ["Cânfora", "Salicilato de Metila", "Óxido de Zinco"],
+      "bulario": {
+        "receita": "Receita Simples",
+        "apresentacoes": "- Acalmin, bisnaga (30 g) - Acalmin, bisnaga (100 g)",
+        "indicacoes": "Pomada antiflogística e sedativa para estados inflamatórios em geral, dores e inchações das juntas e articulações. Para aliviar a dor nos reumatismos, artrites, contusões, machucados e luxações.",
+        "vias": ["Tópica"],
+        "frequenciaUtilizacao": "2 ou mais aplicações diárias",
+        "observacoes": "Passar uma camada de ACALMIN sobre a região lesada, utilizando um pincel ou os próprios dedos e massagear durante alguns minutos para facilitar a absorção."
+      },
+      "interacoes": [],
+      "dosagens": []
+    },
+    {
+      "id": "623",
+      "slug": "aceprovets",
+      "url": "https://vetsmart.com.br/cg/produto/623/aceprovets",
+      "nome": "AceProvetS",
+      "empresa": "PROVETS SIMÕES",
+      "classificacao": "Sedativo",
+      "especies": "Cães e Gatos",
+      "descricao": "Aceprovets é indicado para cães e gatos em todas as situações que requeiram tranquilização, sedação, analgesia e relaxamento muscular.",
+      "principiosAtivos": ["Acepromazina"],
+      "bulario": {
+        "receita": "Controle Especial - Veterinário",
+        "composicao": "Cada 100 mL contém: Acepromazina (maleato) 1,00 g | Veículo q.s.p. 100,00 mL",
+        "registroMapa": "8931",
+        "responsavelTecnico": "Lilion Manhães Pessanha - CRF-RJ 3229",
+        "armazenamento": "Conservar a embalagem bem fechada em local seco, fresco e ao abrigo da luz solar.",
+        "apresentacoes": "- AceProvetS, frasco conta-gotas (20 mL)",
+        "indicacoes": "Indicado para: Tranquilização e sedação; Analgesia e relaxamento muscular; Diminuição das secreções salivares ou respiratórias; Suprimir ou prevenir a êmese; Procedimentos clínicos, cirúrgicos e diagnósticos; Promover indução e recuperação suave da anestesia; Para animais que não são acostumados com viagens longas.",
+        "contraindicacoes": "Reduzir a dose em 50% em raças braquicefálicas como Pequinês, Box, Pugg; e raças gigantes. Não exceder a dosagem de 3 mg.",
+        "superdosagem": "Altas doses podem causar uma acentuada sedação. A dose severa deverá ser ajustada de acordo com a tranquilização desejada.",
+        "vias": ["Oral"],
+        "frequenciaUtilizacao": "Repetir a dose a cada seis ou oito horas se necessário.",
+        "modoUsar": "Cães e gatos: administrar 0,5 a 1,5 mg/Kg (1 a 3 gotas por kg de peso vivo). Pode ser diluído em água de beber ou leite."
+      },
+      "interacoes": [
+        {"medicamento": "Cloridrato de Procaína", "detalhes": ["Tipo: Sinergismo", "Grau: Grave", "Efeito: Potencialização da atividade do Cloridrato de Procaína", "Conduta: Incompatível"]},
+        {"medicamento": "Organofosforados", "detalhes": ["Tipo: Toxicidade", "Grau: Grave", "Efeito: Potencialização da toxicidade do organofosforado", "Conduta: Incompatível"]}
+      ],
+      "dosagens": [{"especie": "Cães e Gatos", "dose": "1-3 gota / kg", "subgrupo": "Recomendado"}]
+    },
+    {
+      "id": "3901",
+      "slug": "acemanana",
+      "url": "https://vetsmart.com.br/cg/produto/3901/acemanana",
+      "nome": "Acemanana",
+      "classificacao": "Imunoestimulante",
+      "especies": "Cães e Gatos",
+      "descricao": "Imunoestimulante e antiviral inespecífico, indicado para o tratamento de viroses felinas e fibrossarcoma vacinal.",
+      "principiosAtivos": ["Acemanana"],
+      "bulario": {
+        "aviso": "Este medicamento pode ser encontrado em apresentações de uso humano, porém com literatura técnica que baseia seu uso na medicina veterinária. O uso de suas informações é de responsabilidade do médico veterinário.",
+        "apresentacoes": "- Acemannan Immunostimulant, ampola (10 mg)",
+        "indicacoes": "Imunoestimulante e antiviral inespecífico, indicado para o tratamento de viroses felinas e fibrossarcoma vacinal.",
+        "contraindicacoes": "Reações prévias de hipersensibilidade.",
+        "efeitosAdversos": "Dor no local da administração, hiperatividade, letargia, febre e hipotensão. Na aplicação venosa pode ocorrer sialorréia, fraqueza muscular, colapso, hipotensão, taquicardia e taquipnéia.",
+        "vias": ["Intraperitoneal"],
+        "duracaoTratamento": "7 dias",
+        "modoUsar": "1 mg/kg durante 7 dias, em mínimo de 6 administrações, associado, no caso de neoplasias, a 2 mg/massa tumoral.",
+        "observacoes": "Após reconstituição, podem ser necessários até 10 minutos para completa dissolução. Usar em máximo de quatro horas.",
+        "farmacodinamica": "A acemanana é um polissacarídeo com propriedades imunoestimulantes e anti-inflamatórias. Modula o sistema imunológico, estimulando macrófagos e linfócitos. Possui ação antioxidante.",
+        "farmacocinetica": "Quando aplicada topicamente, é absorvida pela pele e pelas camadas superficiais dos tecidos. A absorção e eliminação variam dependendo da formulação e características do gel."
+      },
+      "interacoes": [],
+      "dosagens": [{"especie": "Cães e Gatos", "dose": "1 mg / kg", "subgrupo": "Recomendado"}]
+    },
+    {
+      "id": "6050",
+      "slug": "aceponato-de-hidrocortisona-ligvet",
+      "url": "https://vetsmart.com.br/cg/produto/6050/aceponato-de-hidrocortisona-ligvet",
+      "nome": "Aceponato de Hidrocortisona LigVet",
+      "empresa": "LIGVET FARMÁCIA DE MANIPULAÇÃO",
+      "linhaComercial": "MANIPULADOS",
+      "classificacao": "Anti-inflamatório Esteroidal",
+      "especies": "Cães e Gatos",
+      "descricao": "Tratamento sintomático do prurido e inflamação em cães e gatos, decorrentes de dermatites em geral, em áreas corporais mais extensas.",
+      "principiosAtivos": ["Aceponato de Hidrocortisona"],
+      "bulario": {
+        "receita": "Receita Simples",
+        "registroMapa": "Produto isento de registro no MAPA.",
+        "armazenamento": "Conservar à temperatura ambiente em local seco e fresco, entre 15°C e 30°C, ao abrigo da luz solar.",
+        "apresentacoes": "- Shampoo - Spray tópico - Lenços umedecidos",
+        "indicacoes": "Tratamento sintomático do prurido e inflamação em cães e gatos, decorrentes de dermatites em geral, em áreas corporais mais extensas.",
+        "vias": ["Tópica"],
+        "frequenciaUtilizacao": "2 a 3 vezes por dia",
+        "dosagens": "0,06% / animal"
+      },
+      "interacoes": [],
+      "dosagens": [{"especie": "Cães e Gatos", "dose": "0,06% / animal", "subgrupo": "Recomendado"}]
+    },
+    {
+      "id": "105",
+      "slug": "acepran-0-2",
+      "url": "https://vetsmart.com.br/cg/produto/105/acepran-0-2",
+      "nome": "Acepran® 0,2%",
+      "empresa": "VETNIL",
+      "linhaComercial": "SEDATIVOS",
+      "classificacao": "Sedativo",
+      "especies": "Cães",
+      "descricao": "Acepran 0,2% é indicado para cães como sedativo e tranquilizante para facilitar procedimentos diagnósticos, contenção para exames e radiografias, tratamento de feridas, sondagem uretral e procedimentos cirúrgicos menores.",
+      "principiosAtivos": ["Acepromazina"],
+      "bulario": {
+        "receita": "Controle Especial - Veterinário",
+        "composicao": "Cada 100 mL contém: Acepromazina 0,2 g | Veículo q.s.p. 100 mL",
+        "registroMapa": "SP 000139-0.000001",
+        "responsavelTecnico": "Fábio Cavenaghi Mattei CRMV-SP 12005",
+        "apresentacoes": "- Acepran 0,2% 0,2%, frasco-ampola (20 mL)",
+        "indicacoes": "Indicado para cães como sedativo e tranquilizante para: procedimentos diagnósticos, contenção para exames e radiografias, tratamento de feridas e abscessos, sondagem uretral, procedimentos cirúrgicos menores, transporte de animais (promove tranquilização, sonolência e atividade antiemética).",
+        "contraindicacoes": "Derivados da fenotiazina podem potencializar a toxicidade de organofosforados. Não utilizar para controlar tremores por envenenamento. Não utilizar associado ao cloridrato de procaína. Usar com cautela em animais com disfunção hepática ou leucopenia.",
+        "efeitosAdversos": "Tranquilizantes são potentes depressores do SNC. Podem induzir prolongada depressão ou impossibilidade de locomoção. Hipotensão pode ocorrer após rápida injeção intravenosa. Animais braquicefálicos (especialmente Boxer) podem apresentar síncope ou choque.",
+        "gestacaoLactacao": "Não utilizar em fêmeas gestantes e lactantes.",
+        "superdosagem": "Doses excessivas podem causar efeitos extrapiramidais (rigidez, tremor, acinesia). Cães sobreviveram a dosagens de 220 mg/Kg via oral mas apresentaram edema pulmonar e hiperemia.",
+        "vias": ["IM", "IV"],
+        "modoUsar": "Para ser utilizado por via intravenosa ou intramuscular. A dose deve ser estabelecida individualmente.",
+        "observacoes": "Efeitos sedativos começam de 2 a 13 minutos após IV e 6 a 18 minutos após IM, proporcionando 40-140 min e 60-130 min de sedação respectivamente.",
+        "farmacodinamica": "A Acepromazina é um derivado fenotiazínico. Sua principal atividade é o bloqueio dos receptores pós-sinápticos dopaminérgicos mesolímbicos no cérebro. Como antiemético, os fenotiazínicos inibem a zona medular disparadora do vômito.",
+        "farmacocinetica": "Os derivados fenotiazínicos são bem absorvidos por via parenteral. A acepromazina é muito lipofílica e amplamente distribuída pelos tecidos (fígado, pulmões, encéfalo). É metabolizada pela enzima microssômica hepática e eliminada pela urina."
+      },
+      "interacoes": [
+        {"medicamento": "Cloridrato de Procaína", "detalhes": ["Tipo: Sinergismo", "Grau: Grave", "Efeito: Potencialização da atividade do Cloridrato de Procaína", "Conduta: Incompatível"]},
+        {"medicamento": "Organofosforados", "detalhes": ["Tipo: Toxicidade", "Grau: Grave", "Efeito: Potencialização da toxicidade do organofosforado", "Conduta: Incompatível"]}
+      ],
+      "dosagens": [{"especie": "Cães e Gatos", "dose": "0,025-0,1 mL / kg", "subgrupo": "Recomendado"}]
+    },
+    {
+      "id": "2172",
+      "slug": "acepromazina",
+      "url": "https://vetsmart.com.br/cg/produto/2172/acepromazina",
+      "nome": "Acepromazina",
+      "classificacao": "Sedativo",
+      "especies": "Cães e Gatos",
+      "descricao": "Acepromazina é o derivado fenotiazínico mais potente e produz sedação em doses relativamente baixas. Pode ser usada isolada como sedativo ou em associação com opioides para procedimentos diagnósticos e cirúrgicos.",
+      "principiosAtivos": ["Acepromazina"],
+      "bulario": {
+        "aviso": "Este medicamento é de uso humano, porém com literatura técnica que baseia seu uso na medicina veterinária. O uso de suas informações é de responsabilidade do médico veterinário.",
+        "receita": "Controle Especial - Veterinário",
+        "armazenamento": "Deve ser armazenado ao abrigo de luz, calor intenso e congelamento.",
+        "apresentacoes": "- Acepromazina 10 mg/mL, gotas - Acepromazina 10 mg/mL, solução injetável - Acepromazina 0,2%, solução injetável - Acepromazina 1%, solução injetável",
+        "indicacoes": "Sedativo para procedimentos diagnósticos não dolorosos ou em associação com opioides para procedimentos cirúrgicos. Medicação pré-anestésica. Acalmar animais excitados ou agressivos. Transporte de animais (tranquilização, sonolência e atividade antiemética).",
+        "contraindicacoes": "Não utilizar para controlar tremores por envenenamento por fosforados. Por diminuir o limiar convulsivo, não deve ser administrada em animais epiléticos. A administração de adrenalina é contraindicada. Usar com cautela em animais com disfunção hepática ou leucopenia. Evitar o uso em animais com mutação do gene MDR1.",
+        "efeitosAdversos": "Depressores potentes do SNC. Sonolência, apatia, excitação paradoxal em animais predispostos, diminuição do limiar convulsivo, hipotermia, bradicardia. Em felinos pode diminuir a produção de lágrimas.",
+        "gestacaoLactacao": "O uso deve ser evitado em fêmeas gestantes.",
+        "superdosagem": "Alto índice terapêutico. Superdosagens podem causar hipotensão, depressão do SNC, edema pulmonar e hiperemia.",
+        "vias": ["IM", "IV", "Oral", "SC"],
+        "dosagens": "Cães: 0,02-0,05 mg/kg | Gatos: 0,05-0,1 mg/kg",
+        "observacoes": "IMPORTANTE: Não possui efeito analgésico. Não deve ser administrado sem terapia analgésica eficaz em procedimentos dolorosos.",
+        "farmacodinamica": "Agente neuroléptico fenotiazínico que bloqueia os receptores de dopamina pós-sinápticos no SNC. Possui graus de bloqueio anticolinérgico, anti-histamínico, anti-espasmódico e efeitos alfa-adrenérgicos.",
+        "farmacocinetica": "Em cães e gatos, início de ação após IM ou SC é aproximadamente 10–15 minutos e 3–5 minutos após IV. Ações sedativas podem durar de 1 a 2 horas."
+      },
+      "interacoes": [
+        {"medicamento": "Agentes hipotensores", "detalhes": ["Efeito: Risco aditivo de hipotensão"]},
+        {"medicamento": "Cloridrato de Procaína", "detalhes": ["Tipo: Sinergismo", "Grau: Grave", "Efeito: Potencialização da atividade", "Conduta: Incompatível"]},
+        {"medicamento": "Depressores do SNC", "detalhes": ["Efeito: Risco aditivo de depressão do SNC"]},
+        {"medicamento": "Metronidazol", "detalhes": ["Efeito: Risco aditivo de arritmias cardíacas"]},
+        {"medicamento": "Ondansetrona", "detalhes": ["Efeito: Risco aditivo de arritmias cardíacas"]},
+        {"medicamento": "Opióides", "detalhes": ["Efeito: Risco aditivo de hipotensão e potencialização analgésica"]},
+        {"medicamento": "Organofosforados", "detalhes": ["Tipo: Toxicidade", "Grau: Grave", "Conduta: Incompatível"]}
+      ],
+      "dosagens": [
+        {"especie": "Cães", "dose": "0,02-0,05 mg / kg", "subgrupo": "Recomendado"},
+        {"especie": "Gatos", "dose": "0,05-0,1 mg / kg", "subgrupo": "Recomendado"}
+      ]
+    },
+    {
+      "id": "1267",
+      "slug": "aceproven-0-2",
+      "url": "https://vetsmart.com.br/cg/produto/1267/aceproven-0-2",
+      "nome": "Aceproven 0,2%",
+      "empresa": "DECHRA",
+      "linhaComercial": "SEDATIVOS",
+      "classificacao": "Sedativo",
+      "descricao": "Aceproven 0,2% injetável é indicado como sedativo para cães.",
+      "principiosAtivos": ["Maleato de Acepromazina"],
+      "bulario": {
+        "aviso": "Este produto não está mais disponível no mercado.",
+        "principiosAtivos": "Maleato de Acepromazina"
+      },
+      "interacoes": [],
+      "dosagens": []
+    },
+    {
+      "id": "7448",
+      "slug": "alimentacao-natural-true-sabor-carne-para-caes-adultos",
+      "url": "https://vetsmart.com.br/cg/produto/7448/alimentacao-natural-true-sabor-carne-para-caes-adultos",
+      "nome": "Alimentação Natural True Sabor Carne para Cães Adultos",
+      "empresa": "TRUE",
+      "linhaComercial": "ALIMENTAÇÃO NATURAL FRESCA",
+      "classificacao": "Alimento Super Premium Natural",
+      "especies": "Cães",
+      "descricao": "Alimento completo para cães adultos saudáveis de todos os portes. 100% natural, ingredientes frescos cozidos a vapor, sem conservantes, corantes ou transgênicos.",
+      "principiosAtivos": [],
+      "bulario": {
+        "descritivo": "Alimentação 100% natural, feita com ingredientes frescos e cozidos a vapor. Sem conservantes, corantes ou transgênicos. Pronta para servir e não precisa ser congelada.",
+        "composicao": "Carne de bovino (músculo) e coração de bovino, fígado de bovino, acelga, aveia, abóbora, abobrinha, batata, arroz branco, óleo de canola, orégano desidratado, calcário calcítico, fosfato bicálcico, água, sulfatos de ferro/zinco/cobre/manganês, selenito de sódio, iodato de cálcio, vitaminas A, B1, B2, B6, B7, B12, C, D3, E, K3, niacina, ácido pantotênico, ácido fólico, tocoferóis, sal refinado.",
+        "armazenamento": "Após aberto, manter sob refrigeração por no máximo 48 horas."
+      },
+      "interacoes": [],
+      "dosagens": [
+        {"especie": "Cães adultos 1-5 kg", "dose": "63-210 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães adultos 6-10 kg", "dose": "240-354 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães adultos 11-15 kg", "dose": "380-483 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães adultos 16-20 kg", "dose": "507-600 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães adultos 21-25 kg", "dose": "620-708 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães adultos 26-30 kg", "dose": "730-810 g / dia", "subgrupo": "Adultos"}
+      ]
+    },
+    {
+      "id": "7447",
+      "slug": "alimentacao-natural-true-sabor-frango-para-caes-adultos",
+      "url": "https://vetsmart.com.br/cg/produto/7447/alimentacao-natural-true-sabor-frango-para-caes-adultos",
+      "nome": "Alimentação Natural True Sabor Frango para Cães Adultos",
+      "empresa": "TRUE",
+      "linhaComercial": "ALIMENTAÇÃO NATURAL FRESCA",
+      "classificacao": "Alimento Super Premium Natural",
+      "especies": "Cães",
+      "descricao": "Alimento completo para cães adultos saudáveis de todos os portes. Sabor frango, 100% natural.",
+      "principiosAtivos": [],
+      "bulario": {
+        "composicao": "Carne de ave (sobrecoxa), moela de frango, fígado de frango, couve, aveia, abóbora, chuchu, batata, arroz branco, óleo de canola, salsa desidratada, calcário calcítico, fosfato bicálcico, vitaminas e minerais.",
+        "armazenamento": "Após aberto, manter sob refrigeração por no máximo 48 horas."
+      },
+      "interacoes": [],
+      "dosagens": [
+        {"especie": "Cães adultos 1-5 kg", "dose": "65-218 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães adultos 6-10 kg", "dose": "250-366 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães adultos 11-15 kg", "dose": "394-479 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães adultos 16-20 kg", "dose": "522-617 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães adultos 21-25 kg", "dose": "640-730 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães adultos 26-30 kg", "dose": "750-836 g / dia", "subgrupo": "Adultos"}
+      ]
+    },
+    {
+      "id": "7449",
+      "slug": "alimentacao-natural-true-sensitive-sabor-carne-suina-para-caes-adultos",
+      "url": "https://vetsmart.com.br/cg/produto/7449/alimentacao-natural-true-sensitive-sabor-carne-suina-para-caes-adultos",
+      "nome": "Alimentação Natural True Sensitive Sabor Carne Suína para Cães Adultos",
+      "empresa": "TRUE",
+      "linhaComercial": "ALIMENTAÇÃO NATURAL FRESCA",
+      "classificacao": "Alimento Super Premium Natural",
+      "especies": "Cães",
+      "descricao": "Alimento completo para cães adultos saudáveis de todos os portes, fórmula Sensitive.",
+      "principiosAtivos": [],
+      "bulario": {
+        "composicao": "Carne de suíno (pernil e filé mignon), chuchu, batata, arroz branco, óleo de canola, alecrim desidratado, calcário calcítico, fosfato bicálcico, vitaminas e minerais.",
+        "armazenamento": "Após aberto, manter sob refrigeração por no máximo 48 horas."
+      },
+      "interacoes": [],
+      "dosagens": [
+        {"especie": "Cães adultos 1-5 kg", "dose": "64-215 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães adultos 6-10 kg", "dose": "246-360 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães adultos 11-15 kg", "dose": "388-490 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães adultos 16-20 kg", "dose": "514-608 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães adultos 21-25 kg", "dose": "630-718 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães adultos 26-30 kg", "dose": "740-824 g / dia", "subgrupo": "Adultos"}
+      ]
+    },
+    {
+      "id": "4914",
+      "slug": "alinutri-nature-formula-pro-caes-adultos-racas-pequenas-e-medias",
+      "url": "https://vetsmart.com.br/cg/produto/4914/alinutri-nature-formula-pro-caes-adultos-racas-pequenas-e-medias",
+      "nome": "Alinutri Nature Fórmula PRO Cães Adultos Raças Pequenas e Médias",
+      "empresa": "ALINUTRI NUTRIÇÃO ANIMAL",
+      "linhaComercial": "ALIMENTOS SUPER PREMIUM",
+      "classificacao": "Alimento Super Premium",
+      "especies": "Cães",
+      "descricao": "Alinutri Nature Fórmula PRO é indicado para cães de raças pequenas e médias. Alimento completo para alimentação diária racional e equilibrada.",
+      "principiosAtivos": [],
+      "bulario": {
+        "indicacoes": "Indicado para cães de raças pequenas e médias. Preparação destinada a fornecer ao animal a totalidade dos elementos nutritivos necessários para alimentação diária.",
+        "apresentacoes": "Disponível em 2,5 kg e 15 kg",
+        "composicao": "Farinha de vísceras de aves, farinha de torresmo, farinha de peixes, complexo de frutas e vegetais desidratados (espinafre, cenoura, beterraba, manga, maçã, blueberry), arroz quebrado, sorgo, ervilha, microalgas (DHA), algas calcárias, fibra de cana-de-açúcar, óleo de aves, fosfato bicálcico, L-taurina, L-carnitina, sulfato de condroitina, sulfato de glicosamina, prebióticos MOS e Beta-glucanos.",
+        "niveisGarantia": "Umidade (máx.) 10% | Proteína Bruta (mín.) 27% | Extrato Etéreo (mín.) 16% | Cálcio (mín.) 0,8% | Fósforo (mín.) 0,8% | Taurina (mín.) 0,1% | Ômega 3 (mín.) 0,6% | Energia metabolizável: 4.200 kcal/kg",
+        "armazenamento": "Manter embalagem fechada, em ambiente seco e arejado, fora do calor, umidade e luz solar direta."
+      },
+      "interacoes": [],
+      "dosagens": [
+        {"especie": "Cães até 1 kg", "dose": "25-35 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães 5-10 kg", "dose": "75-120 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães 10-15 kg", "dose": "125-200 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães 15-20 kg", "dose": "175-270 g / dia", "subgrupo": "Adultos"},
+        {"especie": "Cães 20-25 kg", "dose": "215-400 g / dia", "subgrupo": "Adultos"}
+      ]
+    }
+  ]
+}

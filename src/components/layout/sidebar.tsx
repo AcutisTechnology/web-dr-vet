@@ -14,6 +14,7 @@ import {
   UserCog,
   CreditCard,
   X,
+  Pill,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/agenda", label: "Agenda", icon: Calendar },
   { href: "/clientes", label: "Clientes & Pets", icon: Users },
+  { href: "/bulario", label: "Bulário Digital", icon: Pill },
   { href: "/internacao", label: "Internação", icon: BedDouble },
   { href: "/pdv", label: "PDV / Vendas", icon: ShoppingCart },
   { href: "/estoque", label: "Estoque", icon: Package },

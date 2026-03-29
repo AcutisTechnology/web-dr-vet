@@ -1,0 +1,288 @@
+{
+  "metadata": {
+    "fonte": "Catálogo interno DrVet",
+    "data_coleta": "2026-03-28",
+    "metodo": "Apify Playwright Scraper + Proxy Residencial",
+    "datasets_apify": {
+      "dataset1_id": "YDCAupx8wgiy2UU2Y",
+      "dataset2_id": "6f5UN60stW3c5zsmw",
+      "download_url": "https://api.apify.com/v2/datasets/YDCAupx8wgiy2UU2Y/items?format=json",
+      "nota": "Os datasets Apify ficam disponíveis por 7 dias. Baixe usando os links acima."
+    },
+    "total_coletado": 141,
+    "nota_cobertura": "Coleta parcial (jobs interrompidos por limite de créditos). Cobre primeiros produtos em ordem alfabética (A-Ag). Para dados completos, baixe via links Apify acima.",
+    "amostra_incluida_neste_arquivo": 10
+  },
+  "medicamentos": [
+    {
+      "id": "1767",
+      "slug": "a-d-e-injetavel-emulsificavel",
+      "url": "https://vetsmart.com.br/be/produto/1767/a-d-e-injetavel-emulsificavel",
+      "nome": "A-D-E Injetável Emulsificável",
+      "empresa": "ZOETIS",
+      "classificacao": "Suplemento",
+      "especies": "Bovinos e Equinos",
+      "descricao": "A-D-E Injetável Emulsificável com apresentações, dosagem e indicação: Indicado como fonte de vitaminas A, D e E.",
+      "principiosAtivos": ["Vitamina A", "Vitamina D3", "Vitamina E"],
+      "bulario": {
+        "receita": "Receita Simples",
+        "composicao": "Cada 100 mL contém: Vitamina A 25.000.000 UI | Vitamina D3 7.000.000 UI | Vitamina E 7.000 UI | Veículo q.s.p. 100 mL",
+        "armazenamento": "Mantenha fora do alcance de crianças e de animais domésticos.",
+        "apresentacoes": "- A-D-E Injetável Emulsificável, frasco (50 mL) - A-D-E Injetável Emulsificável, frasco (250 mL)",
+        "indicacoes": "Indicado como fonte de vitaminas A, D e E nos seguintes casos: prevenir doenças carenciais de vitaminas A, D e E; suprir as reservas vitamínicas em fases difíceis do ano; aumentar a resistência às infecções e auxiliar no tratamento de doenças infecciosas.",
+        "efeitosAdversos": "Casos raros de animais que podem apresentar reações de hipersensibilidade individuais (hipersalivação, incoordenação dos movimentos, edema das mucosas ocular e vaginal), que podem desaparecer espontaneamente em alguns minutos.",
+        "vias": ["IM", "SC"],
+        "frequenciaUtilizacao": "Animais jovens: a cada 45 dias; recria e engorda: a cada 120 dias; animais em confinamento, reprodução, gestação ou lactação: a cada 75 dias.",
+        "dosagens": "Animais Jovens: 1 mL / 50 kg (Bovinos e Equinos) | Recria e engorda / confinamento: 5 mL / animal (Bovinos e Equinos)",
+        "observacoes": "Cuidados: Limpar e desinfetar a seringa, a agulha e o local da aplicação."
+      },
+      "interacoes": [
+        {"medicamento": "Colestipol", "detalhes": ["Tipo: Antagonismo", "Grau: Moderado", "Efeito: Redução da Vitamina E", "Conduta: Ajustar dose"]},
+        {"medicamento": "Hidróxido de Alumínio", "detalhes": ["Tipo: Antagonismo", "Grau: Moderado", "Efeito: Redução da Vitamina A", "Conduta: Ajustar dose"]},
+        {"medicamento": "Neomicina", "detalhes": ["Tipo: Antagonismo", "Grau: Moderado", "Efeito: Redução Vitamina A e E", "Conduta: Ajustar dose"]},
+        {"medicamento": "Sucralfato", "detalhes": ["Tipo: Toxicidade", "Grau: Moderado", "Efeito: Efeito tóxico aditivo", "Conduta: Evitar o uso"]},
+        {"medicamento": "Óleo mineral", "detalhes": ["Tipo: Toxicidade", "Grau: Moderado", "Efeito: Efeito tóxico aditivo", "Conduta: Evitar o uso"]}
+      ],
+      "dosagens": [
+        {"especie": "Bovinos e Equinos (jovens)", "dose": "1 mL / 50 kg", "subgrupo": "Animais Jovens"},
+        {"especie": "Bovinos e Equinos", "dose": "5 mL / animal", "subgrupo": "Recria/engorda/confinamento"}
+      ]
+    },
+    {
+      "id": "2670",
+      "slug": "17-beta",
+      "url": "https://vetsmart.com.br/be/produto/2670/17-beta",
+      "nome": "17 Beta",
+      "empresa": "BOTUPHARMA",
+      "classificacao": "Hormônio",
+      "especies": "Equinos",
+      "descricao": "17 BETA é um estrogênio bioidêntico ao fisiológico, indicado para indução de sinais de estro em fêmeas equinas.",
+      "principiosAtivos": ["17 Beta Estradiol"],
+      "bulario": {
+        "receita": "Receita Simples",
+        "composicao": "Cada 1 mL contém: 17 Beta Estradiol: 10,0 mg | Veículo q.s.p: 1,0 mL",
+        "armazenamento": "Conservar sempre o produto em sua embalagem original, fechada e em local seco, ao abrigo da luz e umidade.",
+        "registroMapa": "Licenciado no MAPA sob nº SP 000211-9.000004 em 23/03/2017.",
+        "responsavelTecnico": "Dr. José Antonio Dell'Aqua Júnior | CRMV/SP 11.220",
+        "apresentacoes": "- 17 Beta 1,0%, frasco-ampola (50 mL)",
+        "indicacoes": "17 BETA é um estrogênio bioidêntico ao fisiológico, indicado para indução de sinais de estro em fêmeas equinas.",
+        "contraindicacoes": "O produto não deve ser utilizado em animais pré-púberes. Não aplicar em animais que apresentem hipersensibilidade a qualquer um dos componentes do produto.",
+        "efeitosAdversos": "Quando utilizado conforme as recomendações do fabricante, o produto não provoca reações adversas.",
+        "vias": ["IM"],
+        "modoUsar": "Aplicar por via intramuscular (IM) profunda em éguas nas dosagens de 1 a 2 mL (10 a 20 mg).",
+        "farmacodinamica": "A administração de estradiol em éguas no anestro profundo é capaz de induzir os sinais de estro dentro de 3 a 6 horas. A utilização de 17β estradiol pode suprimir o desenvolvimento folicular sem alterar a função luteal."
+      },
+      "interacoes": [],
+      "dosagens": [{"especie": "Equinos", "dose": "1-2 mL / animal", "subgrupo": "Adultos"}]
+    },
+    {
+      "id": "668",
+      "slug": "a-d-e-po",
+      "url": "https://vetsmart.com.br/be/produto/668/a-d-e-po",
+      "nome": "A D E - Pó",
+      "empresa": "CHAMPION",
+      "classificacao": "Suplemento",
+      "especies": "Bovinos e Equinos",
+      "descricao": "Indicado para suplementar as deficiências na alimentação, das vitaminas A, D e E.",
+      "principiosAtivos": ["Vitamina A", "Vitamina D3", "Vitamina E"],
+      "bulario": {
+        "receita": "Receita Simples",
+        "composicao": "Vitamina A, Vitamina D3, Vitamina E, e Baunilha",
+        "niveisGarantia": "Vitamina A (mín) - 6.000.000 U.I./kg | Vitamina D3 (mín) - 2.000.000 U.I./kg | Vitamina E (mín) - 5.000 U.I./kg",
+        "armazenamento": "Conservar em local seco, à temperatura máxima de 30°C, fora da luz solar direta e fora do alcance de crianças.",
+        "apresentacoes": "- Balde (5 kg) - Balde (10 kg) - Balde (20 kg) - Saco (0,5 kg) - Saco (1 kg) - Saco (1,5 kg)",
+        "indicacoes": "Indicado para suplementar as deficiências na alimentação, das vitaminas A, D e E.",
+        "vias": ["Oral"],
+        "frequenciaUtilizacao": "24 / 24 horas",
+        "duracaoTratamento": "Uso Contínuo",
+        "observacoes": "Bovinos: 500 g por tonelada de ração ou 1,5 kg em 25 kg de sal. Equinos: 500 g por tonelada de ração."
+      },
+      "interacoes": [],
+      "dosagens": []
+    },
+    {
+      "id": "1605",
+      "slug": "ade",
+      "url": "https://vetsmart.com.br/be/produto/1605/ade",
+      "nome": "ADE",
+      "empresa": "CEVA",
+      "classificacao": "Suplemento",
+      "especies": "Bovinos",
+      "descricao": "No tratamento de carência das vitaminas A, D e E. Através da suplementação vitamínica favorece a conversão alimentar, a fertilidade e a resistência às infecções.",
+      "principiosAtivos": ["Vitamina A", "Vitamina D3", "Vitamina E"],
+      "bulario": {
+        "receita": "Receita Simples",
+        "composicao": "Cada 100 mL contém: Retinol (palmitato - vit. A) 2.500.000 UI | Calciferol (vit. D3) 500.000 UI | Tocoferol (acetato vit. E) 1.650 UI | Veículo q.s.p. 100 mL",
+        "armazenamento": "Conservar em local seco e fresco, ao abrigo da luz solar.",
+        "tempoCarencia": "Abate: Carência zero. Leite: Carência zero.",
+        "apresentacoes": "- ADE, frasco (50 mL) - ADE, frasco (100 mL) - ADE, frasco (200 mL)",
+        "indicacoes": "No tratamento de carência das vitaminas A, D e E. Suplementação vitamínica favorece a conversão alimentar, a fertilidade, o aumento da resistência às infecções e o aumento da produtividade leiteira.",
+        "vias": ["IM Profunda"],
+        "frequenciaUtilizacao": "A dose pode ser repetida a cada 2, 4 e 6 semanas ou de acordo com a orientação do Médico Veterinário.",
+        "dosagens": "Bezerros: 2-5 mL/animal | Bovinos de recria/engorda/vacas em lactação ou gestação: 5-10 mL/animal",
+        "observacoes": "Recomenda-se não aplicar mais de 10 mL em um único local."
+      },
+      "interacoes": [],
+      "dosagens": [
+        {"especie": "Bovinos - Bezerros", "dose": "2-5 mL / animal", "subgrupo": "Bezerros"},
+        {"especie": "Bovinos - Recria/Engorda/Vacas", "dose": "5-10 mL / animal", "subgrupo": "Adultos"}
+      ]
+    },
+    {
+      "id": "694",
+      "slug": "ach-80-desinfetante",
+      "url": "https://vetsmart.com.br/be/produto/694/ach-80-desinfetante",
+      "nome": "ACH - 80 Desinfetante",
+      "empresa": "CHEMITEC",
+      "classificacao": "Desinfetante",
+      "especies": "Bovinos e Equinos",
+      "descricao": "Desinfecção de instalações e ambientes de criação de animais. O princípio ativo é um sal de amônia quaternária com ação microbicida.",
+      "principiosAtivos": ["Cloreto de Benzalcônio"],
+      "bulario": {
+        "receita": "Receita Simples",
+        "composicao": "Cada 100 mL contém: Cloreto de Benzalcônio 40% 80,00 g | Veículo q.s.p. 100,00 mL",
+        "registroMapa": "Licenciado no MAPA sob nº SP 000165-0.000008.",
+        "responsavelTecnico": "Carlos H. A. Baptista - CRF/SP 30.191",
+        "armazenamento": "Conservar à temperatura ambiente (15°C a 30°C), ao abrigo da luz solar.",
+        "apresentacoes": "- Frasco (1 L) - Bambona (5 L)",
+        "indicacoes": "Desinfecção de instalações e ambientes. Eficiente contra E. coli, Salmonella spp, Pseudomonas spp, Proteus spp, Klebsiella spp, Staphylococcus spp, Aspergillus spp.",
+        "contraindicacoes": "Evitar o contato do produto puro com a pele e os olhos.",
+        "vias": ["Ambiental"],
+        "duracaoTratamento": "Os sais de amônia quaternária têm poder residual de 5 a 10 dias.",
+        "modoUsar": "Após limpeza prévia do local, diluir o produto em água e deixar agir por 5 minutos.",
+        "observacoes": "Descontaminação geral: 1:4000 | Lavagem e descontaminação: 1:1000. Recomenda-se usar luvas, mangas compridas e óculos.",
+        "farmacodinamica": "O cloreto de alquil dimetil benzil amônio, também conhecido como cloreto de benzalcônio, é uma solução aquosa que implica na destruição da maioria dos microrganismos das superfícies e equipamentos."
+      },
+      "interacoes": [],
+      "dosagens": []
+    },
+    {
+      "id": "819",
+      "slug": "a-d-e-po-premix",
+      "url": "https://vetsmart.com.br/be/produto/819/a-d-e-po-premix",
+      "nome": "A.D.E Pó Premix",
+      "empresa": "PRADO",
+      "classificacao": "Suplemento",
+      "especies": "Bovinos e Equinos",
+      "descricao": "Suplemento das vitaminas A, D e E para as situações das carências destas vitaminas.",
+      "principiosAtivos": ["Vitamina A", "Vitamina D", "Vitamina E"],
+      "bulario": {
+        "receita": "Receita Simples",
+        "niveisGarantia": "Vitamina A (mín): 12.100.000 UI/kg | Vitamina D3 (mín): 2.000.000 UI/kg | Vitamina E (mín): 6.000 UI/kg | Antioxidante (mín): 500 mg/kg",
+        "apresentacoes": "- Sachê (100 g) - Balde (1 kg) - Balde (5 kg) - Balde (20 kg)",
+        "indicacoes": "Suplemento das vitaminas A, D e E para as situações das carências destas vitaminas.",
+        "contraindicacoes": "Não há.",
+        "vias": ["Oral"],
+        "frequenciaUtilizacao": "24 / 24 horas",
+        "duracaoTratamento": "Uso contínuo ou conforme recomendação do Médico Veterinário.",
+        "observacoes": "Bovinos: 400-600 g por tonelada de ração ou 1,5-2,0 kg para 25 kg de sal comum. Equinos: 400-600 g por tonelada de ração ou 3 g por animal diariamente. Potros: 2 g por animal diariamente."
+      },
+      "interacoes": [
+        {"medicamento": "Colestipol", "detalhes": ["Tipo: Antagonismo", "Grau: Moderado", "Efeito: Redução da Vitamina E", "Conduta: Ajustar dose"]},
+        {"medicamento": "Hidróxido de Alumínio", "detalhes": ["Tipo: Antagonismo", "Grau: Moderado", "Efeito: Redução da Vitamina A", "Conduta: Ajustar dose"]},
+        {"medicamento": "Sucralfato", "detalhes": ["Tipo: Toxicidade", "Grau: Moderado", "Efeito: Efeito tóxico aditivo", "Conduta: Evitar o uso"]},
+        {"medicamento": "Óleo mineral", "detalhes": ["Tipo: Toxicidade", "Grau: Moderado", "Efeito: Efeito tóxico aditivo", "Conduta: Evitar o uso"]}
+      ],
+      "dosagens": []
+    },
+    {
+      "id": "3027",
+      "slug": "acqua-limp",
+      "url": "https://vetsmart.com.br/be/produto/3027/acqua-limp",
+      "nome": "ACQUA Limp",
+      "empresa": "BIOFARM",
+      "linhaComercial": "MEDICAMENTOS",
+      "classificacao": "Oftálmico",
+      "especies": "Bovinos e Equinos",
+      "descricao": "O ACQUA Limp é uma solução oftálmica com pH neutro e propriedade lubrificante ocular. Alivia irritação, ardor e secura ocular. Recomendado para remoção de sujidades e limpeza de secreções oculares antes da aplicação do colírio terapêutico.",
+      "principiosAtivos": ["Álcool polivinílico", "Citrato de Sódio", "Cloreto de Sódio"],
+      "bulario": {
+        "receita": "Receita Simples",
+        "composicao": "Cada 100 ml contém: Álcool polivinílico 1,400 g | Citrato de sódio 0,400g | Cloreto de sódio 0,250g | Veículo q.s.p. 100,0mL",
+        "armazenamento": "Conservar em local seco e fresco, entre 15 a 30ºC, ao abrigo da luz solar.",
+        "tempoCarencia": "O produto não requer período de carência para o abate de bovinos e equinos tratados. O produto não requer período de carência para o consumo de leite.",
+        "registroMapa": "Produto isento de registro no MAPA.",
+        "responsavelTecnico": "Dr. Naur Bellusci Filho - CRMV-SP nº 6516",
+        "apresentacoes": "- Acqua Limp, Frasco (15 mL)",
+        "indicacoes": "Solução oftálmica para alívio de irritação, ardor e secura ocular. Remoção de sujidades e limpeza de secreções oculares antes da aplicação do colírio terapêutico.",
+        "contraindicacoes": "Não deve ser utilizado em animais com hipersensibilidade comprovada aos componentes da fórmula.",
+        "vias": ["Ocular"],
+        "frequenciaUtilizacao": "4 vezes ao dia ou a critério do Médico Veterinário.",
+        "modoUsar": "Instilar sobre a superfície ocular de 3 a 4 gotas, 4 vezes ao dia ou a critério do Médico Veterinário."
+      },
+      "interacoes": [],
+      "dosagens": [{"especie": "Bovinos e Equinos", "dose": "3-4 gotas / animal", "subgrupo": "Recomendado"}]
+    },
+    {
+      "id": "820",
+      "slug": "a-d-e-prado",
+      "url": "https://vetsmart.com.br/be/produto/820/a-d-e-prado",
+      "nome": "A.D.E Prado",
+      "empresa": "PRADO",
+      "classificacao": "Suplemento",
+      "especies": "Bovinos e Equinos",
+      "descricao": "Suplemento das vitaminas A, D e E para as situações das carências destas vitaminas.",
+      "principiosAtivos": ["Vitamina A", "Vitamina D", "Vitamina E"],
+      "bulario": {
+        "receita": "Receita Simples",
+        "composicao": "Vitamina A 270.000 UI | Vitamina D3 50.000 UI | Vitamina E 55 UI | Veículo q.s.p 1 mL",
+        "tempoCarencia": "Abate: carência zero. Leite: carência zero.",
+        "apresentacoes": "- Frasco (10 mL) - Frasco (50 mL)",
+        "indicacoes": "Suplemento das vitaminas A, D e E para as situações das carências destas vitaminas.",
+        "contraindicacoes": "Não há.",
+        "vias": ["IM", "SC"],
+        "frequenciaUtilizacao": "30 - 60 dias",
+        "duracaoTratamento": "Quando necessário, à critério do Médico Veterinário.",
+        "dosagens": "Bovinos e Equinos Adultos: 5 mL/animal | Bovinos Bezerros: 1-2 mL/animal"
+      },
+      "interacoes": [],
+      "dosagens": [
+        {"especie": "Bovinos e Equinos", "dose": "5 mL / animal", "subgrupo": "Adultos"},
+        {"especie": "Bovinos", "dose": "1-2 mL / animal", "subgrupo": "Bezerros"}
+      ]
+    },
+    {
+      "id": "2215",
+      "slug": "ade-gold",
+      "url": "https://vetsmart.com.br/be/produto/2215/ade-gold",
+      "nome": "ADE Gold",
+      "empresa": "DIPRORAMA",
+      "classificacao": "Suplemento",
+      "especies": "Bovinos e Equinos",
+      "descricao": "Previne as deficiências de vitaminas A, D e E, aumenta a fertilidade, melhora o ganho de peso e supre as necessidades vitamínicas.",
+      "principiosAtivos": [],
+      "bulario": {
+        "receita": "Receita Simples",
+        "composicao": "Vitamina A 9.000.000 UI | Vitamina D3 1.500.000 UI | Vitamina E 6.000 UI | Zinco 5.500 mg | Cobre 2.500 mg | Selênio 300 mg | Antioxidante (B.H.T) 1.200 mg",
+        "apresentacoes": "- Pacote (1 kg) - Balde (20 kg)",
+        "indicacoes": "Previne as deficiências de vitaminas A, D e E na alimentação, aumenta a fertilidade e antecipa a cobertura, melhora o ganho de peso.",
+        "vias": ["Oral"],
+        "observacoes": "Aplicar 1 pacote (1 Kg) para cada 25 a 30 Kg de sal mineralizado ou 1 pacote por tonelada de ração. Para animais com sintomas clínicos de deficiência: 2 pacotes em 25 Kg de sal mineralizado."
+      },
+      "interacoes": [],
+      "dosagens": []
+    },
+    {
+      "id": "154",
+      "slug": "agrisept-mc-tabs",
+      "url": "https://vetsmart.com.br/be/produto/154/agrisept-mc-tabs",
+      "nome": "Agrisept MC Tabs",
+      "empresa": "MSD",
+      "classificacao": "Antisséptico",
+      "especies": "Bovinos",
+      "descricao": "Indicado como preventivo e auxiliar no controle das mastites infecciosas em vacas leiteiras. Ativo contra Staphylococcus spp, Streptococcus spp, Corynebacterium spp, E. coli, Listeria ssp e Salmonella spp.",
+      "principiosAtivos": ["Dicloroisocianurato de Sódio Anidro"],
+      "bulario": {
+        "receita": "Receita Simples",
+        "composicao": "Cada comprimido: Dicloroisocianurato de sódio anidro 2,5 g | Excipiente q.s.p 5,0 g",
+        "apresentacoes": "- comprimido (5 g), cartucho com 10 cartelas com 10 comprimidos cada",
+        "indicacoes": "Preventivo e auxiliar no controle das mastites infecciosas em vacas leiteiras. Preventivo e terapêutico na cura das infecções cutâneas nos tetos e no úbere.",
+        "vias": ["Tópica"],
+        "frequenciaUtilizacao": "Pré-dipping em toda ordenha.",
+        "observacoes": "Usar de preferência a solução recém-preparada, não armazenando solução pronta por mais de 7 dias."
+      },
+      "interacoes": [],
+      "dosagens": []
+    }
+  ]
+}

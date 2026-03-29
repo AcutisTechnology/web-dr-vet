@@ -10,6 +10,8 @@ const routeLabels: Record<string, string> = {
   dashboard: "Dashboard",
   agenda: "Agenda",
   clientes: "Clientes & Pets",
+  bulario: "Bulário Digital",
+  calculadora: "Calculadora",
   internacao: "Internação",
   pdv: "PDV / Vendas",
   estoque: "Estoque",

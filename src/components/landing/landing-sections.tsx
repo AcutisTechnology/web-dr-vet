@@ -23,7 +23,7 @@ import {
   Lock,
   Zap,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import CountUp from "@/components/ui/react-bits/count-up";
 import ScrollVelocity from "@/components/ui/react-bits/scroll-velocity";
 import BlurText from "@/components/ui/react-bits/blur-text";
@@ -656,16 +656,18 @@ export function LandingTestimonials() {
 // ─── LandingCTA ───────────────────────────────────────────────────────────────
 
 export function LandingCTA() {
+  const prefersReduced = useReducedMotion();
+
   return (
     <section className="py-24 bg-gradient-to-br from-[#1B2A6B] via-[#243d8a] to-[#2DC6C6] relative overflow-hidden">
       <motion.div
         className="absolute -top-20 -right-20 w-80 h-80 bg-white/10 rounded-full blur-2xl pointer-events-none"
-        animate={{ scale: [1, 1.2, 1] }}
+        animate={prefersReduced ? {} : { scale: [1, 1.2, 1] }}
         transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
         className="absolute -bottom-20 -left-20 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none"
-        animate={{ scale: [1, 1.15, 1] }}
+        animate={prefersReduced ? {} : { scale: [1, 1.15, 1] }}
         transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 5 }}
       />
 
