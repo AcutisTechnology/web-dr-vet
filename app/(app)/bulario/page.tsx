@@ -46,6 +46,7 @@ import {
   listSpecies,
   searchBularioMedications,
 } from "@/lib/bulario";
+import type { DoseSuggestion } from "@/types/bulario";
 import { bularioService, type BularioAiPrescription } from "@/services/bulario.service";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -82,6 +83,63 @@ function hasBulario(med: BularioMedication | null): boolean {
 
 /* ─── Detail content ───────────────────────────────────────────────── */
 
+function DoseConcentrationBlock({ dose }: { dose: DoseSuggestion }) {
+  const hasDose =
+    dose.doseMinMgKg !== null || dose.doseMaxMgKg !== null;
+  const hasConc = dose.concentrationMgMl !== null;
+
+  if (!hasDose && !hasConc) return null;
+
+  const doseLabel =
+    dose.doseMinMgKg !== null
+      ? dose.doseMaxMgKg !== null && dose.doseMaxMgKg !== dose.doseMinMgKg
+        ? `${dose.doseMinMgKg} – ${dose.doseMaxMgKg}`
+        : `${dose.doseMinMgKg}`
+      : "—";
+
+  return (
+    <div
+      className={cn(
+        "grid gap-2",
+        hasDose && hasConc ? "grid-cols-2" : "grid-cols-1",
+      )}
+    >
+      {hasDose && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-primary/70">
+            Dose
+          </p>
+          <p className="mt-0.5 text-xl font-bold leading-none text-primary">
+            {doseLabel}
+            <span className="ml-1 text-sm font-medium text-primary/70">
+              mg/kg
+            </span>
+          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Por administração
+          </p>
+        </div>
+      )}
+      {hasConc && (
+        <div className="rounded-xl border border-cyan-200 bg-cyan-50/50 p-3 dark:border-cyan-800/40 dark:bg-cyan-950/20">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
+            Concentração
+          </p>
+          <p className="mt-0.5 text-xl font-bold leading-none text-cyan-700 dark:text-cyan-300">
+            {dose.concentrationMgMl}
+            <span className="ml-1 text-sm font-medium text-cyan-600/70 dark:text-cyan-400/70">
+              mg/mL
+            </span>
+          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Da apresentação
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MedicationDetail({
   medication,
   aiPrescription,
@@ -93,6 +151,7 @@ function MedicationDetail({
   isLoadingAi: boolean;
   aiError: string | null;
 }) {
+  const dose = useMemo(() => getDoseSuggestion(medication), [medication]);
   const bularioEntries = useMemo(() => {
     if (medication.bulario) {
       const entries = Object.entries(medication.bulario)
@@ -151,6 +210,9 @@ function MedicationDetail({
           </p>
         </div>
       ) : null}
+
+      {/* Dose e Concentração */}
+      <DoseConcentrationBlock dose={dose} />
 
       {/* Estado de loading IA */}
       {isLoadingAi && (
@@ -211,7 +273,6 @@ function MedicationDetail({
 
       {/* CTA calculadora */}
       {(() => {
-        const dose = getDoseSuggestion(medication);
         const params = new URLSearchParams({ nome: medication.nome });
         if (dose.doseMinMgKg !== null)
           params.set("dose", String(dose.doseMinMgKg));
@@ -224,24 +285,6 @@ function MedicationDetail({
               Para cálculo de dose, infusão, hidratação e CRI, use a
               calculadora completa.
             </p>
-            {(dose.doseMinMgKg !== null || dose.concentrationMgMl !== null) && (
-              <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
-                {dose.doseMinMgKg !== null && (
-                  <span className="rounded-full bg-primary/8 px-2 py-0.5 font-medium text-primary">
-                    Dose: {dose.doseMinMgKg}
-                    {dose.doseMaxMgKg && dose.doseMaxMgKg !== dose.doseMinMgKg
-                      ? `–${dose.doseMaxMgKg}`
-                      : ""}{" "}
-                    mg/kg
-                  </span>
-                )}
-                {dose.concentrationMgMl !== null && (
-                  <span className="rounded-full bg-primary/8 px-2 py-0.5 font-medium text-primary">
-                    Conc: {dose.concentrationMgMl} mg/mL
-                  </span>
-                )}
-              </div>
-            )}
             <Button asChild className="mt-2 w-full sm:w-auto">
               <Link href={`/bulario/calculadora?${params.toString()}`}>
                 <Calculator className="mr-2 h-4 w-4" /> Ir para calculadora

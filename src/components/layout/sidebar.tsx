@@ -15,28 +15,58 @@ import {
   CreditCard,
   X,
   Pill,
+  LogOut,
+  UserCircle,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useSessionStore } from "@/stores/session";
 import { useLogoStore } from "@/stores/logo";
 import { canAccessRoute } from "@/lib/permissions";
+import type { UserRole } from "@/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-const SIDEBAR_BG =
-  "linear-gradient(160deg, color-mix(in srgb, var(--primary) 78%, #000 22%) 0%, var(--primary) 52%, color-mix(in srgb, var(--primary) 82%, var(--info) 18%) 100%)";
+const roleLabels: Record<UserRole, string> = {
+  admin: "Administrador",
+  vet: "Veterinário",
+  attendant: "Atendente",
+  financial: "Financeiro",
+};
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/agenda", label: "Agenda", icon: Calendar },
-  { href: "/clientes", label: "Clientes & Pets", icon: Users },
-  { href: "/bulario", label: "Bulário Digital", icon: Pill },
-  { href: "/internacao", label: "Internação", icon: BedDouble },
-  { href: "/pdv", label: "PDV / Vendas", icon: ShoppingCart },
-  { href: "/estoque", label: "Estoque", icon: Package },
-  { href: "/financeiro", label: "Financeiro", icon: DollarSign },
-  { href: "/usuarios", label: "Usuários", icon: UserCog },
-  { href: "/assinatura", label: "Assinatura", icon: CreditCard },
+const navGroups = [
+  {
+    label: null,
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/agenda", label: "Agenda", icon: Calendar },
+      { href: "/clientes", label: "Clientes & Pets", icon: Users },
+      { href: "/bulario", label: "Bulário Digital", icon: Pill },
+    ],
+  },
+  {
+    label: "CLÍNICA",
+    items: [
+      { href: "/internacao", label: "Internação", icon: BedDouble },
+      { href: "/pdv", label: "PDV / Vendas", icon: ShoppingCart },
+      { href: "/estoque", label: "Estoque", icon: Package },
+    ],
+  },
+  {
+    label: "GESTÃO",
+    items: [
+      { href: "/financeiro", label: "Financeiro", icon: DollarSign },
+      { href: "/usuarios", label: "Usuários", icon: UserCog },
+      { href: "/assinatura", label: "Assinatura", icon: CreditCard },
+    ],
+  },
 ];
 
 interface SidebarProps {
@@ -44,7 +74,44 @@ interface SidebarProps {
   onMobileClose?: () => void;
 }
 
-function LogoDisplay({
+function UserAvatar({ name, avatar, size = 36 }: { name: string; avatar?: string; size?: number }) {
+  const initials = name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+
+  if (avatar) {
+    return (
+      <Image
+        src={avatar}
+        alt={name}
+        width={size}
+        height={size}
+        className="rounded-full object-cover shrink-0"
+        style={{ width: size, height: size }}
+        unoptimized
+      />
+    );
+  }
+
+  return (
+    <div
+      className="rounded-full flex items-center justify-center shrink-0 text-white font-semibold"
+      style={{
+        width: size,
+        height: size,
+        fontSize: size * 0.36,
+        background: "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 70%, var(--accent)))",
+      }}
+    >
+      {initials}
+    </div>
+  );
+}
+
+function LogoSection({
   collapsed,
   isMobile,
   onMobileClose,
@@ -59,10 +126,8 @@ function LogoDisplay({
   const [logoError, setLogoError] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // Handle hydration for zustand persist
   useEffect(() => {
     setIsHydrated(true);
-    // Reset logo state when user changes
     setLogoLoaded(false);
     setLogoError(false);
   }, [user?.id]);
@@ -73,107 +138,125 @@ function LogoDisplay({
 
   if (!isMobile && collapsed) {
     return (
-      <div
-        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 overflow-hidden relative"
-        style={{
-          boxShadow:
-            "0 0 0 1px rgba(255,255,255,0.28), 0 8px 16px rgba(5,10,24,0.35)",
-        }}
-      >
-        {/* Skeleton while loading */}
-        {!isHydrated && (
-          <div className="absolute inset-0 bg-white/10 animate-pulse rounded-xl" />
-        )}
-        {isHydrated && showCustomLogo ? (
-          <>
-            {!logoLoaded && (
-              <div className="absolute inset-0 bg-white/10 animate-pulse rounded-xl" />
-            )}
-            <Image
-              src={userLogoUrl}
-              alt="Logo"
-              width={36}
-              height={36}
-              className="object-cover w-full h-full"
-              unoptimized
-              onLoad={() => setLogoLoaded(true)}
-              onError={() => setLogoError(true)}
-            />
-          </>
-        ) : isHydrated ? (
-          <Image
-            src="/images/logo.jpeg"
-            alt="DrVet"
-            width={36}
-            height={36}
-            className="object-cover"
-          />
-        ) : null}
+      <div className="flex justify-center py-4">
+        <div className="w-9 h-9 rounded-xl overflow-hidden relative shrink-0 border border-gray-200">
+          {!isHydrated && <div className="absolute inset-0 bg-gray-100 animate-pulse rounded-xl" />}
+          {isHydrated && showCustomLogo ? (
+            <>
+              {!logoLoaded && <div className="absolute inset-0 bg-gray-100 animate-pulse rounded-xl" />}
+              <Image
+                src={userLogoUrl}
+                alt="Logo"
+                width={36}
+                height={36}
+                className="object-cover w-full h-full"
+                unoptimized
+                onLoad={() => setLogoLoaded(true)}
+                onError={() => setLogoError(true)}
+              />
+            </>
+          ) : isHydrated ? (
+            <Image src="/images/logo.jpeg" alt="DrVet" width={36} height={36} className="object-cover" />
+          ) : null}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-3 w-full">
-      <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 overflow-hidden relative"
-        style={{
-          boxShadow:
-            "0 0 0 1px rgba(255,255,255,0.28), 0 8px 18px rgba(5,10,24,0.36)",
-        }}
-      >
-        {/* Skeleton while hydrating */}
-        {!isHydrated && (
-          <div className="absolute inset-0 bg-white/10 animate-pulse rounded-xl" />
-        )}
-        {isHydrated && showCustomLogo ? (
-          <>
-            {!logoLoaded && (
-              <div className="absolute inset-0 bg-white/10 animate-pulse rounded-xl" />
-            )}
-            <Image
-              src={userLogoUrl}
-              alt="Logo"
-              width={40}
-              height={40}
-              className="object-cover w-full h-full"
-              unoptimized
-              onLoad={() => setLogoLoaded(true)}
-              onError={() => setLogoError(true)}
-            />
-          </>
-        ) : isHydrated ? (
-          <Image
-            src="/images/logo.jpeg"
-            alt="DrVet"
-            width={40}
-            height={40}
-            className="object-cover"
-          />
-        ) : null}
-      </div>
-      <div className="min-w-0 flex-1">
+    <div className="flex items-center justify-between px-4 py-4">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <div className="w-9 h-9 rounded-xl overflow-hidden relative shrink-0 border border-gray-200">
+          {!isHydrated && <div className="absolute inset-0 bg-gray-100 animate-pulse rounded-xl" />}
+          {isHydrated && showCustomLogo ? (
+            <>
+              {!logoLoaded && <div className="absolute inset-0 bg-gray-100 animate-pulse rounded-xl" />}
+              <Image
+                src={userLogoUrl}
+                alt="Logo"
+                width={36}
+                height={36}
+                className="object-cover w-full h-full"
+                unoptimized
+                onLoad={() => setLogoLoaded(true)}
+                onError={() => setLogoError(true)}
+              />
+            </>
+          ) : isHydrated ? (
+            <Image src="/images/logo.jpeg" alt="DrVet" width={36} height={36} className="object-cover" />
+          ) : null}
+        </div>
         {!isHydrated ? (
-          // Skeleton for text
-          <div className="space-y-1">
-            <div className="h-3 bg-white/10 rounded animate-pulse w-16" />
-          </div>
+          <div className="h-3 bg-gray-100 rounded animate-pulse w-16" />
         ) : (
-          <p className="font-bold text-sm leading-tight tracking-widest uppercase text-white truncate">
-            {user?.clinicName ? user.clinicName : "DrVet"}
-          </p>
+          <span className="font-bold text-sm text-gray-900 truncate tracking-wide">
+            {user?.clinicName ?? "DrVet"}
+          </span>
         )}
       </div>
       {isMobile && onMobileClose && (
         <button
           onClick={onMobileClose}
-          className="text-white/60 hover:text-white transition-colors ml-auto shrink-0"
+          className="text-gray-400 hover:text-gray-600 transition-colors ml-2 shrink-0"
           aria-label="Fechar menu"
         >
           <X className="w-5 h-5" />
         </button>
       )}
     </div>
+  );
+}
+
+function UserProfileCard({ collapsed }: { collapsed: boolean }) {
+  const { user, logout } = useSessionStore();
+  const [isHydrated, setIsHydrated] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  function handleLogout() {
+    logout();
+    router.push("/login");
+  }
+
+  if (!isHydrated || !user) return null;
+
+  const trigger = collapsed ? (
+    <div className="flex justify-center px-2 mb-3 cursor-pointer">
+      <UserAvatar name={user.name} avatar={user.avatar} size={32} />
+    </div>
+  ) : (
+    <div className="mx-3 mb-3">
+      <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50/80 cursor-pointer hover:bg-gray-100/80 transition-colors group">
+        <UserAvatar name={user.name} avatar={user.avatar} size={34} />
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-semibold text-gray-800 truncate leading-tight">{user.name}</p>
+          <p className="text-[11px] text-gray-500 truncate leading-tight mt-0.5">
+            {roleLabels[user.role] ?? user.role}
+          </p>
+        </div>
+        <ChevronRight className="w-4 h-4 text-gray-400 shrink-0 group-hover:text-gray-600 transition-colors" />
+      </div>
+    </div>
+  );
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent side="right" align="start" className="w-48">
+        <DropdownMenuItem onClick={() => router.push("/perfil")}>
+          <UserCircle className="w-4 h-4 mr-2 text-gray-500" />
+          Meu perfil
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+          <LogOut className="w-4 h-4 mr-2" />
+          Sair
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -190,131 +273,89 @@ function SidebarContent({
 }) {
   const pathname = usePathname();
   const { user } = useSessionStore();
-  const visibleItems = navItems.filter((item) => canAccessRoute(user, item.href));
 
   return (
     <aside
-        className={cn(
-          "relative flex flex-col text-white transition-all duration-300 shrink-0 overflow-hidden h-full",
-          isMobile ? "w-64" : collapsed ? "w-16" : "w-60",
-        )}
-        style={{
-        background: SIDEBAR_BG,
-        borderRight: "1px solid rgba(255,255,255,0.12)",
-      }}
+      className={cn(
+        "relative flex flex-col transition-all duration-300 shrink-0 h-full bg-white",
+        isMobile ? "w-64" : collapsed ? "w-16" : "w-60",
+      )}
+      style={{ borderRight: "1px solid #e5e7eb" }}
     >
-      {/* Orbs decorativos de fundo */}
-      <div
-        className="pointer-events-none absolute -top-16 -left-16 w-48 h-48 rounded-full opacity-20 blur-3xl"
-        style={{ background: "var(--accent)" }}
-      />
-      <div
-        className="pointer-events-none absolute bottom-10 -right-10 w-40 h-40 rounded-full opacity-10 blur-3xl"
-        style={{ background: "var(--info)" }}
-      />
-
       {/* Logo */}
-      <div
-        className={cn(
-          "relative z-10 flex items-center gap-3 px-4 py-5",
-          !isMobile && collapsed ? "justify-center px-2" : "",
-        )}
-      >
-        <LogoDisplay
-          collapsed={collapsed}
-          isMobile={isMobile}
-          onMobileClose={onMobileClose}
-        />
-      </div>
+      <LogoSection collapsed={collapsed} isMobile={isMobile} onMobileClose={onMobileClose} />
 
-      {/* Divisor com gradiente teal */}
-      <div
-        className="mx-3 mb-2 h-px opacity-30"
-            style={{
-              background:
-            "linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 90%, transparent), transparent)",
-            }}
-          />
+      {/* Divider */}
+      <div className="mx-3 mb-3 h-px bg-gray-100" />
+
+      {/* User profile */}
+      <UserProfileCard collapsed={collapsed} />
 
       {/* Nav */}
-      <nav className="relative z-10 flex-1 px-2 py-2 overflow-y-auto space-y-1">
-        {visibleItems.map(({ href, label, icon: Icon }) => {
-          const active = pathname.startsWith(href);
+      <nav className="flex-1 px-2 overflow-y-auto">
+        {navGroups.map((group) => {
+          const visibleItems = group.items.filter((item) => canAccessRoute(user, item.href));
+          if (visibleItems.length === 0) return null;
+
           return (
-            <Link
-              key={href}
-              href={href}
-              onClick={isMobile ? onMobileClose : undefined}
-              className={cn(
-                "group relative flex items-center gap-3 py-2.5 rounded-xl text-sm transition-all duration-200",
-                !isMobile && collapsed ? "justify-center px-0" : "px-3",
-                active
-                  ? "text-white font-medium"
-                  : "text-white/45 hover:text-white/80",
+            <div key={group.label ?? "main"} className="mb-1">
+              {group.label && !collapsed && (
+                <p className="px-3 pt-3 pb-1 text-[10px] font-semibold text-gray-400 tracking-widest uppercase">
+                  {group.label}
+                </p>
               )}
-                style={
-                  active
-                    ? {
-                      background:
-                        "linear-gradient(135deg, rgba(45,198,198,0.16) 0%, rgba(45,198,198,0.06) 100%)",
-                      boxShadow:
-                        "inset 0 0 0 1px rgba(45,198,198,0.28), 0 4px 14px rgba(0,0,0,0.2)",
-                    }
-                  : undefined
-              }
-              onMouseEnter={(e) => {
-                if (!active)
-                  (e.currentTarget as HTMLElement).style.background =
-                    "rgba(255,255,255,0.06)";
-              }}
-              onMouseLeave={(e) => {
-                if (!active)
-                  (e.currentTarget as HTMLElement).style.background = "";
-              }}
-              title={!isMobile && collapsed ? label : undefined}
-            >
-              <Icon
-                className="w-[18px] h-[18px] shrink-0 transition-all duration-200"
-                style={
-                  active
-                        ? {
-                        color: "var(--accent)",
-                        filter: "drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 35%, transparent))",
+              {group.label && collapsed && <div className="mt-3 mx-3 h-px bg-gray-100" />}
+              <div className="space-y-0.5">
+                {visibleItems.map(({ href, label, icon: Icon }) => {
+                  const active = pathname.startsWith(href);
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      onClick={isMobile ? onMobileClose : undefined}
+                      title={!isMobile && collapsed ? label : undefined}
+                      className={cn(
+                        "group flex items-center gap-3 py-2 rounded-lg text-sm transition-all duration-150",
+                        !isMobile && collapsed ? "justify-center px-0 mx-1" : "px-3",
+                        active
+                          ? "font-medium"
+                          : "text-gray-500 hover:text-gray-800 hover:bg-gray-100/80",
+                      )}
+                      style={
+                        active
+                          ? {
+                              color: "var(--primary)",
+                              background: "color-mix(in srgb, var(--primary) 10%, transparent)",
+                            }
+                          : undefined
                       }
-                    : undefined
-                }
-              />
-              {(isMobile || !collapsed) && (
-                <span className="tracking-wide text-[13px]">{label}</span>
-              )}
-              {/* Dot indicador no collapsed */}
-              {active && !isMobile && collapsed && (
-                <span
-                  className="absolute right-1 top-1 w-1.5 h-1.5 rounded-full"
-                  style={{
-                    background: "var(--accent)",
-                    boxShadow: "0 0 4px color-mix(in srgb, var(--accent) 55%, transparent)",
-                  }}
-                />
-              )}
-            </Link>
+                    >
+                      <Icon
+                        className={cn("shrink-0 transition-colors", collapsed && !isMobile ? "w-5 h-5" : "w-[17px] h-[17px]")}
+                        style={active ? { color: "var(--primary)" } : undefined}
+                      />
+                      {(isMobile || !collapsed) && (
+                        <span className="text-[13px] tracking-wide truncate">{label}</span>
+                      )}
+                      {active && !isMobile && collapsed && (
+                        <span
+                          className="absolute right-1 top-1 w-1.5 h-1.5 rounded-full"
+                          style={{ background: "var(--primary)" }}
+                        />
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </nav>
 
-      {/* Rodapé */}
+      {/* Footer */}
       {(isMobile || !collapsed) && (
-        <div className="relative z-10 px-4 py-3">
-          <div
-            className="h-px mb-3 opacity-20"
-            style={{
-              background:
-                "linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 90%, transparent), transparent)",
-            }}
-          />
-          <p className="text-[10px] text-white/25 text-center tracking-[0.2em] uppercase">
-            v1.0
-          </p>
+        <div className="px-4 py-3 border-t border-gray-100">
+          <p className="text-[10px] text-gray-300 text-center tracking-[0.2em] uppercase">v1.0</p>
         </div>
       )}
 
@@ -322,45 +363,30 @@ function SidebarContent({
       {!isMobile && (
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="absolute -right-3 top-22 z-20 flex items-center justify-center w-6 h-6 rounded-full text-white/60 hover:text-white transition-all duration-200"
-          style={{
-            background: "linear-gradient(135deg, color-mix(in srgb, var(--primary) 75%, #000 25%), var(--primary))",
-            border: "1px solid rgba(255,255,255,0.24)",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-          }}
+          className="absolute -right-3 top-[22px] z-20 flex items-center justify-center w-6 h-6 rounded-full bg-white border border-gray-200 text-gray-400 hover:text-gray-700 hover:border-gray-300 transition-all duration-200 shadow-sm"
           aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
         >
-          {collapsed ? (
-            <ChevronRight className="w-3 h-3" />
-          ) : (
-            <ChevronLeft className="w-3 h-3" />
-          )}
+          {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
         </button>
       )}
     </aside>
   );
 }
 
-export function Sidebar({
-  mobileOpen = false,
-  onMobileClose,
-}: SidebarProps) {
+export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
     <>
       {/* Desktop sidebar */}
       <div className="hidden md:flex">
-        <SidebarContent
-          collapsed={collapsed}
-          setCollapsed={setCollapsed}
-        />
+        <SidebarContent collapsed={collapsed} setCollapsed={setCollapsed} />
       </div>
 
       {/* Mobile drawer backdrop */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
           onClick={onMobileClose}
         />
       )}
