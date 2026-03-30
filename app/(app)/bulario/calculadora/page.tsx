@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Calculator,
   Droplets,
   Gauge,
   HeartPulse,
+  PawPrint,
   Syringe,
   Timer,
 } from "lucide-react";
@@ -45,9 +47,14 @@ function MetricCard({ label, value }: { label: string; value: string }) {
 }
 
 export default function BularioCalculadoraPage() {
+  const searchParams = useSearchParams();
+  const prefilledNome = searchParams.get("nome") ?? "";
+  const prefilledDose = searchParams.get("dose") ?? "";
+  const prefilledConc = searchParams.get("concentracao") ?? "";
+
   const [weightKg, setWeightKg] = useState("");
-  const [doseMgKg, setDoseMgKg] = useState("");
-  const [concentrationMgMl, setConcentrationMgMl] = useState("");
+  const [doseMgKg, setDoseMgKg] = useState(prefilledDose);
+  const [concentrationMgMl, setConcentrationMgMl] = useState(prefilledConc);
   const [frequencyHours, setFrequencyHours] = useState("12");
 
   const [hydrationWeight, setHydrationWeight] = useState("");
@@ -174,6 +181,33 @@ export default function BularioCalculadoraPage() {
           </div>
         </CardContent>
       </Card>
+
+      {prefilledNome && (
+        <div className="flex items-center gap-2.5 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5">
+          <PawPrint className="h-4 w-4 shrink-0 text-primary" />
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+            <span className="font-semibold text-primary">{prefilledNome}</span>
+            {prefilledDose && (
+              <span className="text-xs text-muted-foreground">
+                Dose sugerida:{" "}
+                <strong className="text-foreground">{prefilledDose} mg/kg</strong>
+              </span>
+            )}
+            {prefilledConc && (
+              <span className="text-xs text-muted-foreground">
+                Concentração:{" "}
+                <strong className="text-foreground">{prefilledConc} mg/mL</strong>
+              </span>
+            )}
+          </div>
+          <Link
+            href="/bulario"
+            className="shrink-0 text-xs text-muted-foreground underline-offset-2 hover:underline"
+          >
+            Trocar
+          </Link>
+        </div>
+      )}
 
       <Tabs defaultValue="dose" className="space-y-3">
         <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-xl bg-muted p-1 md:grid-cols-4">
