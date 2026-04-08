@@ -27,6 +27,7 @@ export interface User {
   avatar?: string;
   logoUrl?: string; // URL da logo do usuário/clínica
   active: boolean;
+  isPlatformAdmin?: boolean;
   createdAt: string;
   permissions?: ModulePermissions; // granular module access (clinic_user only)
 }

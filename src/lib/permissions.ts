@@ -14,8 +14,15 @@ function hasModulePermission(user: User | null | undefined, module: ModuleKey): 
   return Boolean(user.permissions?.[module]);
 }
 
+function canAccessAdmin(user: User | null | undefined): boolean {
+  if (!user) return false;
+  return user.isPlatformAdmin === true;
+}
+
 export function canAccessRoute(user: User | null | undefined, pathname: string): boolean {
   if (!user) return false;
+
+  if (pathname.startsWith("/admin")) return canAccessAdmin(user);
 
   if (pathname.startsWith("/financeiro")) return hasModulePermission(user, "financeiro");
   if (pathname.startsWith("/pdv")) return hasModulePermission(user, "pdv");

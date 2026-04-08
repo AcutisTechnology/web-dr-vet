@@ -19,6 +19,7 @@ const routeLabels: Record<string, string> = {
   fiscal: "Fiscal / Notas",
   mensagens: "Mensagens",
   usuarios: "Usuários",
+  admin: "Admin SaaS",
   novo: "Novo",
   new: "Novo",
   editar: "Editar",

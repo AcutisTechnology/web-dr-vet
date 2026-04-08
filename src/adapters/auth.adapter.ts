@@ -14,6 +14,7 @@ export function adaptApiUserToUser(apiUser: ApiUser): User {
     logoUrl: apiUser.logo_url ?? undefined,
     permissions: (apiUser.permissions ?? undefined) as ModulePermissions | undefined,
     active: apiUser.active,
+    isPlatformAdmin: apiUser.is_platform_admin,
     createdAt: apiUser.created_at,
   };
 }

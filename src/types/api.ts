@@ -12,6 +12,7 @@ export interface ApiUser {
   invite_status: string | null;
   invite_sent_at: string | null;
   active: boolean;
+  is_platform_admin: boolean;
   clinic: ApiClinic | null;
   created_at: string;
   updated_at: string;

@@ -17,10 +17,11 @@ import {
   Pill,
   LogOut,
   UserCircle,
+  Shield,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { useSessionStore } from "@/stores/session";
 import { useLogoStore } from "@/stores/logo";
@@ -64,6 +65,7 @@ const navGroups = [
     items: [
       { href: "/financeiro", label: "Financeiro", icon: DollarSign },
       { href: "/usuarios", label: "Usuários", icon: UserCog },
+      { href: "/admin", label: "Admin SaaS", icon: Shield },
       { href: "/assinatura", label: "Assinatura", icon: CreditCard },
     ],
   },
@@ -72,6 +74,14 @@ const navGroups = [
 interface SidebarProps {
   mobileOpen?: boolean;
   onMobileClose?: () => void;
+}
+
+function useHydrated() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 }
 
 function UserAvatar({ name, avatar, size = 36 }: { name: string; avatar?: string; size?: number }) {
@@ -124,13 +134,7 @@ function LogoSection({
   const { getLogo } = useLogoStore();
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [logoError, setLogoError] = useState(false);
-  const [isHydrated, setIsHydrated] = useState(false);
-
-  useEffect(() => {
-    setIsHydrated(true);
-    setLogoLoaded(false);
-    setLogoError(false);
-  }, [user?.id]);
+  const isHydrated = useHydrated();
 
   const userId = user?.id ?? "";
   const userLogoUrl = isHydrated && userId ? getLogo(userId) : null;
@@ -209,12 +213,8 @@ function LogoSection({
 
 function UserProfileCard({ collapsed }: { collapsed: boolean }) {
   const { user, logout } = useSessionStore();
-  const [isHydrated, setIsHydrated] = useState(false);
+  const isHydrated = useHydrated();
   const router = useRouter();
-
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
 
   function handleLogout() {
     logout();
