@@ -480,7 +480,7 @@ export default function PDVPage() {
               <Plus className="w-4 h-4 mr-1" /> Novo Produto
             </Button>
           </div>
-          <div className="rounded-lg border overflow-hidden">
+          <div className="overflow-hidden rounded-lg border bg-white">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
@@ -568,7 +568,7 @@ export default function PDVPage() {
               <Plus className="w-4 h-4 mr-1" /> Novo Serviço
             </Button>
           </div>
-          <div className="rounded-lg border overflow-hidden">
+          <div className="overflow-hidden rounded-lg border bg-white">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
@@ -710,7 +710,7 @@ export default function PDVPage() {
                         key={p.id}
                         onClick={() => addProduct(p)}
                         disabled={p.stock === 0}
-                        className="text-left p-3 border rounded-lg hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="rounded-lg border bg-white p-3 text-left transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <p className="text-sm font-medium truncate">{p.name}</p>
                         <p className="text-xs text-muted-foreground">
@@ -738,7 +738,7 @@ export default function PDVPage() {
                       <button
                         key={s.id}
                         onClick={() => addService(s)}
-                        className="text-left p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                        className="rounded-lg border bg-white p-3 text-left transition-colors hover:bg-muted/50"
                       >
                         <p className="text-sm font-medium truncate">{s.name}</p>
                         <Badge variant="outline" className="text-xs">

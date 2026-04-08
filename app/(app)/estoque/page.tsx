@@ -337,8 +337,8 @@ export default function EstoquePage() {
             </Select>
           </div>
 
-          <div className="rounded-lg border overflow-hidden">
-            <Table>
+          <div className="overflow-hidden rounded-lg border bg-white">
+            <Table className="bg-white">
               <TableHeader>
                 <TableRow>
                   <TableHead>Produto</TableHead>
@@ -431,8 +431,8 @@ export default function EstoquePage() {
         </TabsContent>
 
         <TabsContent value="moves" className="mt-3">
-          <div className="rounded-lg border overflow-hidden">
-            <Table>
+          <div className="overflow-hidden rounded-lg border bg-white">
+            <Table className="bg-white">
               <TableHeader>
                 <TableRow>
                   <TableHead>Data</TableHead>

@@ -44,7 +44,7 @@ export function Topbar({ onMobileMenuToggle }: TopbarProps) {
       .toUpperCase() ?? "?";
 
   return (
-    <header className="h-14 border-b bg-background flex items-center px-3 sm:px-6 gap-2 sm:gap-4 shrink-0">
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-white px-3 sm:gap-4 sm:px-6">
       {/* Hamburguer — mobile only */}
       <Button
         variant="ghost"

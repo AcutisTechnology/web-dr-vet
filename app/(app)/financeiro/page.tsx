@@ -477,8 +477,8 @@ export default function FinanceiroPage() {
           </Select>
         </div>
 
-        <div className="rounded-lg border overflow-hidden">
-          <Table>
+        <div className="overflow-hidden rounded-lg border bg-white">
+          <Table className="bg-white">
             <TableHeader>
               <TableRow>
                 <TableHead>Vencimento</TableHead>
