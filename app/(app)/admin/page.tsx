@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { formatDistanceToNowStrict, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -14,6 +15,7 @@ import {
   Sparkles,
   RefreshCw,
   Building2,
+  MousePointerClick,
 } from "lucide-react";
 import { useAdminOverview } from "@/hooks/use-admin-overview";
 import type { AdminClinicAccount } from "@/types/admin";
@@ -139,6 +141,7 @@ function KpiCard({
 }
 
 export default function AdminPage() {
+  const router = useRouter();
   const { data, isLoading, isError, refetch, isFetching } = useAdminOverview();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<SubscriptionStatus | "all">("all");
@@ -214,6 +217,10 @@ export default function AdminPage() {
             <RefreshCw className={cn("mr-2 h-4 w-4", isFetching && "animate-spin")} />
             Atualizar
           </Button>
+          <Badge variant="outline" className="h-9 rounded-full px-3 text-xs">
+            <MousePointerClick className="mr-2 h-3.5 w-3.5" />
+            Clique na linha para abrir
+          </Badge>
         </div>
       </div>
 
@@ -268,7 +275,7 @@ export default function AdminPage() {
             <div className="flex flex-col gap-1">
               <CardTitle className="text-base">Contas monitoradas</CardTitle>
               <CardDescription>
-                Filtre por status, plano e busque por clinica, responsavel ou email.
+                Filtre por status, plano e busque por conta, responsavel ou email.
               </CardDescription>
             </div>
 
@@ -278,7 +285,7 @@ export default function AdminPage() {
                 <Input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Buscar clinica, responsavel ou email"
+                  placeholder="Buscar conta, responsavel ou email"
                   className="pl-9"
                 />
               </div>
@@ -319,9 +326,9 @@ export default function AdminPage() {
                     <TableHead>Conta</TableHead>
                     <TableHead>Plano</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Usuarios</TableHead>
                     <TableHead className="text-right">Clientes</TableHead>
                     <TableHead className="text-right">Pets</TableHead>
+                    <TableHead>Cadastro</TableHead>
                     <TableHead>Ultima atividade</TableHead>
                     <TableHead>Renovacao</TableHead>
                   </TableRow>
@@ -329,18 +336,37 @@ export default function AdminPage() {
                 <TableBody>
                   {filteredAccounts.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="h-28 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={7} className="h-28 text-center text-sm text-muted-foreground">
                         Nenhuma conta encontrada com os filtros atuais.
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredAccounts.map((account) => (
-                      <TableRow key={account.id}>
+                      <TableRow
+                        key={account.id}
+                        className="group cursor-pointer [&_td]:cursor-pointer"
+                        onClick={() => router.push(`/admin/${account.id}`)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            router.push(`/admin/${account.id}`);
+                          }
+                        }}
+                        tabIndex={0}
+                        role="link"
+                      >
                         <TableCell className="min-w-[240px]">
-                          <div className="space-y-1">
-                            <div className="font-medium text-foreground">{account.clinicName}</div>
-                            <div className="text-xs text-muted-foreground">{account.ownerName}</div>
-                            <div className="text-xs text-muted-foreground">{account.ownerEmail}</div>
+                          <div className="space-y-1 rounded-md outline-none">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="font-medium text-foreground group-hover:text-primary">{account.clinicName}</div>
+                                <div className="text-xs text-muted-foreground">{account.ownerName}</div>
+                                <div className="text-xs text-muted-foreground">{account.ownerEmail}</div>
+                              </div>
+                              <span className="text-xs font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
+                                Abrir
+                              </span>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -354,9 +380,11 @@ export default function AdminPage() {
                             {statusLabels[account.subscriptionStatus]}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right font-medium">{account.usersCount}</TableCell>
                         <TableCell className="text-right font-medium">{account.clientsCount}</TableCell>
                         <TableCell className="text-right font-medium">{account.petsCount}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">{formatDate(account.createdAt)}</div>
+                        </TableCell>
                         <TableCell>
                           <div className="space-y-1">
                             <div className="text-sm">{formatRelativeDate(account.lastActivityAt)}</div>

@@ -41,3 +41,54 @@ export interface AdminOverview {
   insights: AdminOverviewInsights;
   accounts: AdminClinicAccount[];
 }
+
+export interface AdminAccountClient {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string;
+  petsCount: number;
+  active: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface AdminAccountUser {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  role: string;
+  accountType: string;
+  active: boolean;
+  isPlatformAdmin: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface AdminAccountPet {
+  id: string;
+  name: string;
+  clientName: string;
+  species: string;
+  breed: string;
+  status: string;
+  examEventsCount: number;
+  hasExamUsage: boolean;
+  lastExamAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface AdminAccountDetailSummary {
+  activeUsersCount: number;
+  petsWithExamUsageCount: number;
+  totalExamEventsCount: number;
+}
+
+export interface AdminAccountDetail {
+  account: AdminClinicAccount;
+  summary: AdminAccountDetailSummary;
+  users: AdminAccountUser[];
+  clients: AdminAccountClient[];
+  pets: AdminAccountPet[];
+}
