@@ -66,6 +66,66 @@ import { formatDate, formatCurrency, exportToCSV } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 
+interface PrescriptionDraftItem {
+  medication: string;
+  dosage: string;
+  quantity: string;
+  route: string;
+  notes: string;
+}
+
+interface PrescriptionPrintMeta {
+  vetName?: string;
+  vetCrmv?: string;
+  clinicName?: string;
+  clinicAddress?: string;
+  clinicPhone?: string;
+  issueDate?: string;
+  rxNotes?: string;
+}
+
+function escapeHtml(value: string | null | undefined) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function parsePrescriptionMeta(value: unknown): PrescriptionPrintMeta | null {
+  if (!isRecord(value)) return null;
+
+  return {
+    vetName: typeof value.vetName === "string" ? value.vetName : undefined,
+    vetCrmv: typeof value.vetCrmv === "string" ? value.vetCrmv : undefined,
+    clinicName: typeof value.clinicName === "string" ? value.clinicName : undefined,
+    clinicAddress: typeof value.clinicAddress === "string" ? value.clinicAddress : undefined,
+    clinicPhone: typeof value.clinicPhone === "string" ? value.clinicPhone : undefined,
+    issueDate: typeof value.issueDate === "string" ? value.issueDate : undefined,
+    rxNotes: typeof value.rxNotes === "string" ? value.rxNotes : undefined,
+  };
+}
+
+function parsePrescriptionItems(value: unknown): PrescriptionDraftItem[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter(isRecord)
+    .map((item) => ({
+      medication: typeof item.medication === "string" ? item.medication : "",
+      dosage: typeof item.dosage === "string" ? item.dosage : "",
+      quantity: typeof item.quantity === "string" ? item.quantity : "",
+      route: typeof item.route === "string" ? item.route : "",
+      notes: typeof item.notes === "string" ? item.notes : "",
+    }))
+    .filter((item) => item.medication.trim().length > 0);
+}
+
 const EMPTY_AN: PetAnamnesis = {
   vomiting: "",
   diarrhea: "",
@@ -526,6 +586,7 @@ export default function PetDetailPage() {
   const [saveAnamnesisDialogOpen, setSaveAnamnesisDialogOpen] = useState(false);
   const [anamnesisTitle, setAnamnesisTitle] = useState("");
   const [savingSnapshot, setSavingSnapshot] = useState(false);
+  const [savingPrescription, setSavingPrescription] = useState(false);
   const [rx, setRx] = useState({
     vetName: "",
     vetCrmv: "",
@@ -600,6 +661,16 @@ export default function PetDetailPage() {
     setAn({ ...EMPTY_AN, ...(pet.anamnesis ?? {}) });
     setDirty(false);
   }, [pet]);
+
+  useEffect(() => {
+    setRx((current) => ({
+      ...current,
+      vetName: current.vetName || currentUser?.name || "",
+      clinicName: current.clinicName === "DrVet" && currentUser?.clinicName
+        ? currentUser.clinicName
+        : current.clinicName,
+    }));
+  }, [currentUser?.name, currentUser?.clinicName]);
 
   const PET_FINANCE_INCOME_TYPES = [
     "consultation",
@@ -1126,13 +1197,153 @@ export default function PetDetailPage() {
       `prontuario-${pet?.name ?? "pet"}`,
     );
   };
-  const handlePrintPrescription = (event: ApiMedicalEvent) => {
+  const openPrescriptionPrint = ({
+    items,
+    meta,
+    printedAt,
+  }: {
+    items: PrescriptionDraftItem[];
+    meta: PrescriptionPrintMeta;
+    printedAt: string;
+  }) => {
+    if (!pet || !client) return;
+
+    const printableItems = items.filter((item) => item.medication.trim());
     const win = window.open("", "_blank");
     if (!win) return;
-    win.document.write(
-      `<html><head><title>Receita</title><style>body{font-family:Poppins,Arial,sans-serif;padding:30px;max-width:600px}.blk{margin:10px 0;padding:10px;border:1px solid #dde3ee;border-radius:4px}</style></head><body><h2 style="color:#1b2a6b">VetDom – Receituário</h2><p><b>Pet:</b> ${pet?.name} | <b>Tutor:</b> ${client?.name} | <b>Data:</b> ${formatDate(event.date)}</p><hr/>${event.medications ? '<div class="blk"><b>Medicações:</b><br/>' + event.medications + "</div>" : ""}${event.diagnosis ? '<div class="blk"><b>Diagnóstico:</b><br/>' + event.diagnosis + "</div>" : ""}${event.treatment ? '<div class="blk"><b>Tratamento:</b><br/>' + event.treatment + "</div>" : ""}<hr/><p style="font-size:12px;color:#5e6b85">Impresso em ${new Date().toLocaleString("pt-BR")}</p></body></html>`,
-    );
+
+    const userLogoUrl = currentUser?.id ? getLogo(currentUser.id) : null;
+    const clinicDisplayName = meta.clinicName || currentUser?.clinicName || "DrVet";
+    const doctorName = meta.vetName || currentUser?.name || "Médico(a) Veterinário(a)";
+    const issueDate = meta.issueDate || printedAt;
+
+    const rxCss = `
+      @page{size:A5 portrait;margin:0}
+      *{box-sizing:border-box;margin:0;padding:0}
+      html,body{width:148mm;min-height:210mm}
+      body{font-family:'Poppins',Arial,sans-serif;background:#eef2f7;color:#14213d;padding:12px}
+      .sheet{width:100%;max-width:148mm;min-height:calc(210mm - 24px);margin:0 auto;background:#fff;border:1px solid #d8e0ec;border-radius:18px;overflow:hidden;box-shadow:0 18px 48px rgba(15,23,42,.08)}
+      .top-band{height:10px;background:linear-gradient(90deg,#1b2a6b,#2f7eea)}
+      .page{padding:20px 18px 18px}
+      .header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding-bottom:14px;border-bottom:1px solid #dbe4f0}
+      .logo-area{display:flex;gap:14px;align-items:center}
+      .logo-img{width:46px;height:46px;object-fit:contain;border-radius:12px;border:1px solid #dbe4f0;padding:5px;background:#fff}
+      .logo-mark{font-size:20px;font-weight:800;color:#1b2a6b;letter-spacing:-.03em;line-height:1.1}
+      .logo-mark span{color:#2f7eea}
+      .logo-sub{font-size:9px;color:#64748b;margin-top:3px}
+      .clinic-info{text-align:right;font-size:9px;color:#475569;line-height:1.5;max-width:180px}
+      .clinic-name{font-size:11px;font-weight:700;color:#0f172a;margin-bottom:2px}
+      .title-box{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin:14px 0 12px}
+      .title{font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#0f172a}
+      .title-note{font-size:9px;color:#64748b;margin-top:3px}
+      .date-chip{border:1px solid #dbe4f0;border-radius:999px;padding:6px 9px;font-size:9px;color:#334155;background:#f8fafc;white-space:nowrap}
+      .patient{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;background:#f8fafc;border:1px solid #dbe4f0;border-radius:14px;padding:12px 14px;margin-bottom:14px}
+      .field-label{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:700;margin-bottom:4px}
+      .field-value{font-size:11px;font-weight:600;color:#0f172a;line-height:1.35}
+      .section{margin-top:12px}
+      .section-title{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#1b2a6b;margin-bottom:8px}
+      .items{display:flex;flex-direction:column;gap:8px}
+      .item{display:grid;grid-template-columns:26px 1fr;gap:10px;padding:10px 12px;border:1px solid #dbe4f0;border-radius:12px;background:#fff}
+      .item-index{width:26px;height:26px;border-radius:999px;background:#1b2a6b;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center}
+      .item-title{font-size:12px;font-weight:800;color:#0f172a;margin-bottom:4px;line-height:1.3}
+      .item-meta{font-size:9px;color:#475569;line-height:1.55}
+      .item-note{margin-top:4px;font-size:9px;color:#5b21b6;font-style:italic;line-height:1.45}
+      .observations{margin-top:12px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;padding:10px 12px;font-size:10px;line-height:1.6;white-space:pre-wrap;color:#334155}
+      .footer{margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+      .signature{padding-top:8px;border-top:1px solid #475569;text-align:center;font-size:9px;color:#334155;min-height:44px}
+      .signature strong{display:block;font-size:10px;color:#0f172a;margin-bottom:2px}
+      .footnote{margin-top:12px;padding-top:8px;border-top:1px solid #e2e8f0;font-size:8px;color:#64748b;text-align:center}
+      @media print{html,body{width:148mm;min-height:210mm;background:#fff;padding:0}.sheet{width:148mm;min-height:210mm;box-shadow:none;border:none;border-radius:0}.page{padding:18px 16px 14px}}
+    `;
+
+    const itemsHtml = printableItems
+      .map((item, index) => {
+        const itemMeta = [
+          item.dosage && `<strong>Dose:</strong> ${escapeHtml(item.dosage)}`,
+          item.quantity && `<strong>Quantidade:</strong> ${escapeHtml(item.quantity)}`,
+          item.route && `<strong>Via:</strong> ${escapeHtml(item.route)}`,
+        ]
+          .filter(Boolean)
+          .join(" &nbsp;|&nbsp; ");
+
+        return `
+          <div class="item">
+            <div class="item-index">${index + 1}</div>
+            <div>
+              <div class="item-title">${escapeHtml(item.medication)}</div>
+              <div class="item-meta">${itemMeta || "Sem instruções adicionais"}</div>
+              ${item.notes ? `<div class="item-note">${escapeHtml(item.notes)}</div>` : ""}
+            </div>
+          </div>`;
+      })
+      .join("");
+
+    const headerLogoHtml = userLogoUrl
+      ? `<div class="logo-area"><img src="${escapeHtml(userLogoUrl)}" alt="Logo" class="logo-img" /><div><div class="logo-mark">${escapeHtml(clinicDisplayName)}</div><div class="logo-sub">Receituário médico veterinário</div></div></div>`
+      : `<div class="logo-area"><div><div class="logo-mark">Dr<span>Vet</span></div><div class="logo-sub">${escapeHtml(clinicDisplayName)}</div></div></div>`;
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receituário – ${escapeHtml(pet.name)}</title><style>${rxCss}</style></head><body><div class="sheet"><div class="top-band"></div><div class="page"><div class="header">${headerLogoHtml}<div class="clinic-info"><div class="clinic-name">${escapeHtml(clinicDisplayName)}</div>${meta.clinicAddress ? `${escapeHtml(meta.clinicAddress)}<br/>` : ""}${meta.clinicPhone ? `Tel: ${escapeHtml(meta.clinicPhone)}<br/>` : ""}${doctorName ? `Vet responsável: ${escapeHtml(doctorName)}<br/>` : ""}${meta.vetCrmv ? `CRMV: ${escapeHtml(meta.vetCrmv)}` : ""}</div></div><div class="title-box"><div><div class="title">Prescrição Médica Veterinária</div><div class="title-note">Documento emitido para acompanhamento terapêutico do paciente.</div></div><div class="date-chip">Emissão: ${escapeHtml(formatDate(issueDate))}</div></div><div class="patient"><div><div class="field-label">Paciente</div><div class="field-value">${escapeHtml(pet.name)}</div></div><div><div class="field-label">Tutor</div><div class="field-value">${escapeHtml(client.name)}</div></div><div><div class="field-label">Espécie / Raça</div><div class="field-value">${escapeHtml(`${SP[pet.species]} / ${pet.breed || "Não informada"}`)}</div></div><div><div class="field-label">Peso</div><div class="field-value">${escapeHtml(pet.weight ? `${pet.weight} kg` : "Não informado")}</div></div></div><div class="section"><div class="section-title">Itens prescritos</div><div class="items">${itemsHtml || '<div class="item"><div class="item-index">!</div><div><div class="item-title">Nenhum item prescrito</div></div></div>'}</div></div>${meta.rxNotes ? `<div class="observations"><strong>Observações gerais</strong><br/>${escapeHtml(meta.rxNotes)}</div>` : ""}<div class="footer"><div class="signature"><strong>${escapeHtml(doctorName)}</strong>${meta.vetCrmv ? `CRMV: ${escapeHtml(meta.vetCrmv)}` : "CRMV: ____________________"}</div><div class="signature"><strong>Assinatura e carimbo</strong>&nbsp;</div></div><div class="footnote">Impresso em ${escapeHtml(new Date().toLocaleString("pt-BR"))} • Documento gerado pela plataforma DrVet</div></div></div></body></html>`;
+
+    win.document.write(html);
+    win.document.close();
     win.print();
+  };
+
+  const handleSavePrescription = async () => {
+    if (!pet) return;
+
+    const items = rx.items.filter((item) => item.medication.trim());
+
+    if (items.length === 0) {
+      toast({
+        title: "Adicione ao menos um medicamento à receita",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setSavingPrescription(true);
+
+      await medicalEventService.create({
+        pet_id: pet.id,
+        type: "prescription",
+        date: rx.date || new Date().toISOString().split("T")[0],
+        title: `Receita - ${pet.name} - ${formatDate(rx.date || new Date().toISOString())}`,
+        description: `${items.length} ${items.length === 1 ? "medicamento prescrito" : "medicamentos prescritos"}`,
+        notes: rx.rxNotes || undefined,
+        prescription_items: items,
+        medications: {
+          vetName: rx.vetName || currentUser?.name || "",
+          vetCrmv: rx.vetCrmv,
+          clinicName: rx.clinicName || currentUser?.clinicName || "",
+          clinicAddress: rx.clinicAddress,
+          clinicPhone: rx.clinicPhone,
+          issueDate: rx.date || new Date().toISOString().split("T")[0],
+          rxNotes: rx.rxNotes,
+        },
+      });
+
+      qc.invalidateQueries({ queryKey: ["medical-events", petId] });
+      setActiveTab("prontuario");
+      toast({ title: "Receita salva no prontuário com sucesso" });
+    } catch {
+      toast({ title: "Erro ao salvar receita no prontuário", variant: "destructive" });
+    } finally {
+      setSavingPrescription(false);
+    }
+  };
+
+  const handlePrintPrescription = (event: ApiMedicalEvent) => {
+    openPrescriptionPrint({
+      items: parsePrescriptionItems(event.prescription_items),
+      meta: parsePrescriptionMeta(event.medications) ?? {
+        issueDate: event.date,
+        rxNotes: event.notes ?? undefined,
+        vetName: event.vet?.name,
+      },
+      printedAt: event.date,
+    });
   };
   const handlePrintAnamnesis = () => {
     if (!pet || !client) return;
@@ -1485,104 +1696,19 @@ ${r("Observações clínicas", an.clinicalObservations)}
 
   const handlePrintRx = () => {
     if (!pet || !client) return;
-    const win = window.open("", "_blank");
-    if (!win) return;
-
-    // Use user's custom logo or fall back to DrVet branding
-    const userLogoUrl = currentUser?.id ? getLogo(currentUser.id) : null;
-    const clinicDisplayName = currentUser?.clinicName || rx.clinicName || "DrVet";
-    const doctorName = rx.vetName || currentUser?.name || "Médico(a) Veterinário(a)";
-
-    const rxCss = `
-      *{box-sizing:border-box;margin:0;padding:0}
-      body{font-family:'Poppins',Arial,sans-serif;font-size:13px;color:#1a1a1a;background:#fff}
-      .page{max-width:720px;margin:0 auto;padding:32px 40px}
-      .header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:16px;border-bottom:3px solid #1b2a6b;margin-bottom:20px}
-      .logo-area{display:flex;align-items:center;gap:12px}
-      .logo-img{width:56px;height:56px;object-fit:contain;border-radius:8px}
-      .logo-text{font-size:22px;font-weight:800;color:#1b2a6b;letter-spacing:-.5px}.logo-text span{color:#2f7eea}
-      .logo-subtext{font-size:10px;color:#666;margin-top:2px}
-      .clinic-info{text-align:right;font-size:11px;color:#555;line-height:1.6}
-      .patient{background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;padding:10px 14px;margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
-      .patient .field .lbl{font-size:9px;text-transform:uppercase;color:#7c3aed;font-weight:700;letter-spacing:.06em}.patient .field .val{font-size:12px;font-weight:600}
-      h2{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#1b2a6b;font-weight:700;margin-bottom:10px;padding-bottom:4px;border-bottom:1px solid #e0e7ff}
-      .item{display:grid;grid-template-columns:24px 1fr;gap:0 10px;margin-bottom:14px;page-break-inside:avoid}
-      .item-num{width:24px;height:24px;background:#1b2a6b;color:#fff;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px}
-      .item-body .med{font-size:14px;font-weight:700;color:#1e1b4b}
-      .item-body .details{font-size:11px;color:#555;margin-top:3px;line-height:1.7}
-      .item-body .item-notes{font-size:11px;color:#7c3aed;font-style:italic;margin-top:2px}
-      .obs{background:#fafafa;border:1px solid #e5e7eb;border-radius:4px;padding:8px 12px;font-size:11px;color:#444;margin-top:12px;white-space:pre-wrap}
-      .footer{margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
-      .sig-box{border-top:1px solid #444;padding-top:6px;text-align:center;font-size:11px;color:#555}
-      .disclaimer{font-size:9px;color:#aaa;text-align:center;margin-top:20px;border-top:1px solid #eee;padding-top:8px}
-      @media print{.page{padding:16px 20px}}
-    `;
-    const itemsHtml = rx.items
-      .filter((it) => it.medication.trim())
-      .map(
-        (it, i) => `
-      <div class="item">
-        <div class="item-num">${i + 1}</div>
-        <div class="item-body">
-          <div class="med">${it.medication}</div>
-          <div class="details">${[it.dosage && `<b>Dose:</b> ${it.dosage}`, it.quantity && `<b>Quantidade:</b> ${it.quantity}`, it.route && `<b>Via:</b> ${it.route}`].filter(Boolean).join(" &nbsp;|&nbsp; ")}</div>
-          ${it.notes ? `<div class="item-notes">↳ ${it.notes}</div>` : ""}
-        </div>
-      </div>`,
-      )
-      .join("");
-
-    // Header left: logo image if available, else DrVet text
-    const headerLogoHtml = userLogoUrl
-      ? `<div class="logo-area">
-          <img src="${userLogoUrl}" alt="Logo" class="logo-img" />
-          <div>
-            <div class="logo-text">${clinicDisplayName}</div>
-            <div class="logo-subtext">Dr. ${doctorName}</div>
-          </div>
-        </div>`
-      : `<div class="logo-area">
-          <div>
-            <div class="logo-text">Dr<span>Vet</span></div>
-            <div class="logo-subtext">${clinicDisplayName}</div>
-            <div style="font-size:10px;color:#888;margin-top:1px">Dr. ${doctorName}</div>
-          </div>
-        </div>`;
-
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receituário – ${pet.name}</title><style>${rxCss}</style></head>
-<body><div class="page">
-<div class="header">
-  ${headerLogoHtml}
-  <div class="clinic-info">
-    ${rx.clinicAddress ? `${rx.clinicAddress}<br/>` : ""}
-    ${rx.clinicPhone ? `Tel: ${rx.clinicPhone}<br/>` : ""}
-    Data: ${formatDate(rx.date || new Date().toISOString())}
-  </div>
-</div>
-<div class="patient">
-  <div class="field"><div class="lbl">Paciente</div><div class="val">${pet.name}</div></div>
-  <div class="field"><div class="lbl">Espécie / Raça</div><div class="val">${SP[pet.species]} – ${pet.breed || "–"}</div></div>
-  <div class="field"><div class="lbl">Tutor</div><div class="val">${client.name}</div></div>
-  ${pet.weight ? `<div class="field"><div class="lbl">Peso</div><div class="val">${pet.weight} kg</div></div>` : ""}
-  ${pet.color ? `<div class="field"><div class="lbl">Cor / Pelagem</div><div class="val">${pet.color}</div></div>` : ""}
-</div>
-<h2>Prescrição Médica Veterinária</h2>
-${itemsHtml || "<p style='color:#aaa;font-size:12px'>Nenhum item prescrito.</p>"}
-${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` : ""}
-<div class="footer">
-  <div class="sig-box">
-    ${doctorName}<br/>
-    ${rx.vetCrmv ? `CRMV: ${rx.vetCrmv}` : "CRMV: ___________________"}
-  </div>
-  <div class="sig-box">
-    Assinatura<br/>&nbsp;
-  </div>
-</div>
-<div class="disclaimer">Este receituário é válido por 30 dias a partir da data de emissão. ${clinicDisplayName} – Sistema de Gestão Veterinária</div>
-</div></body></html>`;
-    win.document.write(html);
-    win.document.close();
-    win.print();
+    openPrescriptionPrint({
+      items: rx.items,
+      meta: {
+        vetName: rx.vetName,
+        vetCrmv: rx.vetCrmv,
+        clinicName: rx.clinicName,
+        clinicAddress: rx.clinicAddress,
+        clinicPhone: rx.clinicPhone,
+        issueDate: rx.date,
+        rxNotes: rx.rxNotes,
+      },
+      printedAt: rx.date || new Date().toISOString(),
+    });
   };
 
   if (loading)
@@ -2486,10 +2612,21 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                   Receituário de{" "}
                   <span className="text-primary font-semibold">{pet.name}</span>
                 </p>
-                <Button size="sm" onClick={handlePrintRx}>
-                  <Printer className="w-4 h-4 mr-1" />
-                  Imprimir Receita
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleSavePrescription}
+                    disabled={savingPrescription}
+                  >
+                    <Save className="w-4 h-4 mr-1" />
+                    {savingPrescription ? "Salvando..." : "Salvar no prontuário"}
+                  </Button>
+                  <Button size="sm" onClick={handlePrintRx}>
+                    <Printer className="w-4 h-4 mr-1" />
+                    Imprimir Receita
+                  </Button>
+                </div>
               </div>
               {/* Cabeçalho da clínica */}
               <Card>
@@ -3699,6 +3836,45 @@ ${rx.rxNotes ? `<div class="obs"><b>Observações:</b><br/>${rx.rxNotes}</div>` 
                                                     ))}
                                                   </div>
                                                 </div>
+                                              )}
+                                            </div>
+                                          );
+                                        })()}
+                                        {event.type === "prescription" && (() => {
+                                          const prescriptionItems = parsePrescriptionItems(event.prescription_items);
+                                          const prescriptionMeta = parsePrescriptionMeta(event.medications);
+
+                                          if (prescriptionItems.length === 0 && !prescriptionMeta?.rxNotes) {
+                                            return null;
+                                          }
+
+                                          return (
+                                            <div className="mt-2 rounded-xl border border-warning/20 bg-warning/5 p-3 space-y-2">
+                                              {prescriptionItems.length > 0 && (
+                                                <div className="space-y-2">
+                                                  {prescriptionItems.map((item, index) => (
+                                                    <div key={`${event.id}-${index}`} className="rounded-lg border border-border/70 bg-background p-2.5">
+                                                      <p className="text-sm font-semibold text-foreground">{item.medication}</p>
+                                                      <p className="mt-1 text-xs text-muted-foreground">
+                                                        {[
+                                                          item.dosage && `Dose: ${item.dosage}`,
+                                                          item.quantity && `Quantidade: ${item.quantity}`,
+                                                          item.route && `Via: ${item.route}`,
+                                                        ]
+                                                          .filter(Boolean)
+                                                          .join(" · ") || "Sem instruções adicionais"}
+                                                      </p>
+                                                      {item.notes && (
+                                                        <p className="mt-1 text-xs italic text-[color:var(--warning)]">{item.notes}</p>
+                                                      )}
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              )}
+                                              {prescriptionMeta?.rxNotes && (
+                                                <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                                                  <strong>Observações:</strong> {prescriptionMeta.rxNotes}
+                                                </p>
                                               )}
                                             </div>
                                           );
