@@ -1,6 +1,19 @@
 import type { AccountType } from "./index";
 import type { SubscriptionPlan, SubscriptionStatus } from "./subscription";
 
+export interface AdminSubscriptionDetails {
+  id: string;
+  status: SubscriptionStatus;
+  plan: SubscriptionPlan;
+  amount: number;
+  trialEndsAt: string | null;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  canceledAt: string | null;
+}
+
+export type AdminSubscriptionAction = "activate" | "extend_trial" | "deactivate";
+
 export interface AdminClinicAccount {
   id: string;
   clinicName: string;
@@ -18,6 +31,7 @@ export interface AdminClinicAccount {
   lastActivityAt: string | null;
   trialEndsAt: string | null;
   currentPeriodEnd: string | null;
+  subscription?: AdminSubscriptionDetails | null;
 }
 
 export interface AdminOverviewTotals {

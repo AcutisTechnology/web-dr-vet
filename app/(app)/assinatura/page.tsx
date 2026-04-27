@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { subscriptionService } from "@/services/subscription.service";
 import {
   Card,
@@ -23,6 +24,7 @@ import {
   ShieldCheck,
   Clock,
   XCircle,
+  Info,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -156,6 +158,7 @@ function TrialProgressCard({ trialEndsAt }: { trialEndsAt: string }) {
 export default function SubscriptionPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [needsManualConfirm, setNeedsManualConfirm] = useState(false);
 
   const { data: subscription, isLoading, error } = useQuery({
     queryKey: ["subscription"],
@@ -187,30 +190,38 @@ export default function SubscriptionPage() {
     },
   });
 
-  const reactivateMutation = useMutation({
-    mutationFn: subscriptionService.reactivateSubscription,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["subscription"] });
-      toast({ title: "Assinatura reativada!", description: "Você ganhou 7 dias de teste gratuito." });
-    },
-    onError: () => {
-      toast({ title: "Não foi possível reativar.", variant: "destructive" });
-    },
-  });
-
   const checkPaymentMutation = useMutation({
     mutationFn: subscriptionService.checkPaymentStatus,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["subscription"] });
-      toast({
-        title: data.message || "Status verificado",
-        description: data.subscription?.status === "active"
-          ? "Sua assinatura foi ativada!"
-          : "Aguardando confirmação do pagamento.",
-      });
+      if (data.requires_manual_confirmation) {
+        setNeedsManualConfirm(true);
+        toast({
+          title: "Verificação automática indisponível",
+          description: "Se você já realizou o pagamento, use o botão de confirmação manual abaixo.",
+          variant: "destructive",
+        });
+      } else if (data.subscription?.status === "active") {
+        setNeedsManualConfirm(false);
+        toast({ title: "Pagamento confirmado!", description: "Sua assinatura foi ativada com sucesso." });
+      } else {
+        toast({ title: data.message || "Aguardando pagamento", description: "Nenhuma confirmação recebida ainda." });
+      }
     },
     onError: () => {
       toast({ title: "Não foi possível verificar o pagamento.", variant: "destructive" });
+    },
+  });
+
+  const confirmPaymentMutation = useMutation({
+    mutationFn: subscriptionService.confirmPayment,
+    onSuccess: () => {
+      setNeedsManualConfirm(false);
+      queryClient.invalidateQueries({ queryKey: ["subscription"] });
+      toast({ title: "Assinatura ativada!", description: "Seu acesso foi liberado com sucesso." });
+    },
+    onError: () => {
+      toast({ title: "Erro ao confirmar pagamento.", description: "Tente novamente ou entre em contato com o suporte.", variant: "destructive" });
     },
   });
 
@@ -252,7 +263,9 @@ export default function SubscriptionPage() {
   // ── Derived state ────────────────────────────────────────────────────────
   const isTrialExpired = subscription.has_expired_trial && !subscription.is_active;
   const isOnTrial      = subscription.is_on_trial;
-  const needsPayment   = (isOnTrial || isTrialExpired) && subscription.status !== "canceled";
+  // Show payment button for every non-active state except voluntarily canceled.
+  // This covers: ongoing trial, expired trial, expired (admin block), past_due.
+  const needsPayment   = !subscription.is_active && subscription.status !== "canceled";
   const hasPending     = subscription.transactions?.some((t) => t.status === "pending");
 
   return (
@@ -263,10 +276,9 @@ export default function SubscriptionPage() {
         <p className="text-muted-foreground text-sm mt-1">Gerencie seu plano e pagamentos</p>
       </div>
 
-      {/* Trial progress — shown whenever in trial (active or expired), not when active/canceled */}
+      {/* Trial progress — only for trial state, not expired/canceled/blocked */}
       {subscription.trial_ends_at &&
-        subscription.status !== "active" &&
-        subscription.status !== "canceled" && (
+        subscription.status === "trial" && (
           <TrialProgressCard trialEndsAt={subscription.trial_ends_at} />
         )}
 
@@ -280,6 +292,28 @@ export default function SubscriptionPage() {
             {subscription.current_period_end && (
               <> Próxima cobrança em <strong>{formatDate(subscription.current_period_end)}</strong>.</>
             )}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Blocked by admin banner */}
+      {subscription.status === "expired" && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Acesso Bloqueado</AlertTitle>
+          <AlertDescription>
+            Seu acesso foi suspenso. Para restabelecer, reative sua assinatura abaixo ou entre em contato com o suporte.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Past due banner */}
+      {subscription.status === "past_due" && (
+        <Alert className="border-warning/30 bg-warning/8">
+          <AlertCircle className="h-4 w-4 text-[color:var(--warning)]" />
+          <AlertTitle className="text-[color:var(--warning)]">Pagamento em Atraso</AlertTitle>
+          <AlertDescription className="text-[color:var(--warning)]">
+            Há um pagamento pendente. Regularize para manter o acesso à plataforma.
           </AlertDescription>
         </Alert>
       )}
@@ -340,22 +374,19 @@ export default function SubscriptionPage() {
 
           <Separator />
 
+          {/* Manual confirmation alert */}
+          {needsManualConfirm && (
+            <Alert className="border-warning/30 bg-warning/8">
+              <Info className="h-4 w-4 text-[color:var(--warning)]" />
+              <AlertTitle className="text-[color:var(--warning)]">Confirme seu pagamento</AlertTitle>
+              <AlertDescription className="text-[color:var(--warning)]">
+                Não conseguimos verificar seu pagamento automaticamente. Se você já realizou o pagamento via PIX ou cartão, clique em <strong>Confirmar Pagamento</strong> abaixo para liberar seu acesso.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Actions */}
           <div className="flex flex-wrap gap-3">
-            {(subscription.status === "canceled" ||
-              subscription.status === "past_due" ||
-              subscription.status === "expired") && (
-              <Button
-                onClick={() => reactivateMutation.mutate()}
-                disabled={reactivateMutation.isPending}
-                className="bg-primary hover:bg-primary/90"
-              >
-                {reactivateMutation.isPending
-                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Reativando...</>
-                  : <><CheckCircle2 className="w-4 h-4 mr-2" />Reativar Assinatura</>}
-              </Button>
-            )}
-
             {needsPayment && (
               <Button
                 onClick={() => createPaymentMutation.mutate()}
@@ -377,6 +408,18 @@ export default function SubscriptionPage() {
                 {checkPaymentMutation.isPending
                   ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Verificando...</>
                   : <><Clock className="w-4 h-4 mr-2" />Verificar Pagamento</>}
+              </Button>
+            )}
+
+            {needsManualConfirm && hasPending && (
+              <Button
+                onClick={() => confirmPaymentMutation.mutate()}
+                disabled={confirmPaymentMutation.isPending}
+                className="bg-warning text-white hover:bg-warning/90"
+              >
+                {confirmPaymentMutation.isPending
+                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Confirmando...</>
+                  : <><CheckCircle2 className="w-4 h-4 mr-2" />Confirmar Pagamento</>}
               </Button>
             )}
 

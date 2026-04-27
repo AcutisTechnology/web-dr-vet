@@ -2,18 +2,49 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useState } from "react";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowLeft, Building2, CreditCard, FileSearch, Mail, PawPrint, Phone, TriangleAlert, Users } from "lucide-react";
-import { useAdminAccountDetail } from "@/hooks/use-admin-overview";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  Building2,
+  CreditCard,
+  FileSearch,
+  Mail,
+  PawPrint,
+  Phone,
+  TriangleAlert,
+  Users,
+  ShieldCheck,
+  ShieldOff,
+  RefreshCw,
+  Loader2,
+  CalendarClock,
+  AlertTriangle,
+} from "lucide-react";
+import { useAdminAccountDetail, adminKeys } from "@/hooks/use-admin-overview";
+import { adminService } from "@/services/admin.service";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import type { SubscriptionStatus } from "@/types/subscription";
+import type { AdminSubscriptionAction } from "@/types/admin";
 
+// ── Label / colour maps ───────────────────────────────────────────────────────
 const statusLabels: Record<SubscriptionStatus, string> = {
   trial: "Trial",
   active: "Ativa",
@@ -30,23 +61,296 @@ const statusColors: Record<SubscriptionStatus, string> = {
   expired: "bg-destructive/12 text-destructive border-transparent",
 };
 
+// ── Date helpers ──────────────────────────────────────────────────────────────
 function formatDate(value: string | null) {
-  if (!value) return "-";
+  if (!value) return "—";
   return format(new Date(value), "dd/MM/yyyy", { locale: ptBR });
 }
 
 function formatRelativeDate(value: string | null) {
   if (!value) return "Sem atividade";
-  return formatDistanceToNowStrict(new Date(value), {
-    addSuffix: true,
-    locale: ptBR,
-  });
+  return formatDistanceToNowStrict(new Date(value), { addSuffix: true, locale: ptBR });
 }
 
+// ── Duration options ──────────────────────────────────────────────────────────
+const ACTIVATE_OPTIONS = [
+  { label: "30 dias (1 mês)", months: 1 },
+  { label: "90 dias (3 meses)", months: 3 },
+  { label: "180 dias (6 meses)", months: 6 },
+  { label: "365 dias (1 ano)", months: 12 },
+];
+
+const TRIAL_OPTIONS = [
+  { label: "+ 7 dias", days: 7 },
+  { label: "+ 14 dias", days: 14 },
+  { label: "+ 30 dias", days: 30 },
+];
+
+// ── Dialog state type ─────────────────────────────────────────────────────────
+type DialogType = "activate" | "extend_trial" | "deactivate" | null;
+
+// ── Subscription management card ──────────────────────────────────────────────
+function SubscriptionManagementCard({
+  accountId,
+  account,
+  onSuccess,
+}: {
+  accountId: string;
+  account: ReturnType<typeof useAdminAccountDetail>["data"] extends infer T
+    ? T extends { account: infer A }
+      ? A
+      : never
+    : never;
+  onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+  const [dialog, setDialog] = useState<DialogType>(null);
+  const [selectedMonths, setSelectedMonths] = useState(1);
+  const [selectedDays, setSelectedDays] = useState(7);
+
+  const mutation = useMutation({
+    mutationFn: (payload: { action: AdminSubscriptionAction; months?: number; days?: number }) =>
+      adminService.toggleSubscription(accountId, payload),
+    onSuccess: (data) => {
+      toast({ title: "Assinatura atualizada", description: data.message });
+      setDialog(null);
+      onSuccess();
+    },
+    onError: () => {
+      toast({ title: "Erro ao atualizar assinatura", variant: "destructive" });
+    },
+  });
+
+  const sub = account.subscription;
+  const status = account.subscriptionStatus;
+  const isActive = status === "active";
+  const isTrial = status === "trial";
+  const isBlocked = status === "expired" || status === "canceled" || status === "past_due";
+
+  function handleConfirm() {
+    if (dialog === "activate") {
+      mutation.mutate({ action: "activate", months: selectedMonths });
+    } else if (dialog === "extend_trial") {
+      mutation.mutate({ action: "extend_trial", days: selectedDays });
+    } else if (dialog === "deactivate") {
+      mutation.mutate({ action: "deactivate" });
+    }
+  }
+
+  return (
+    <>
+      <Card className="border-2">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+                Gerenciar Assinatura
+              </CardTitle>
+              <CardDescription>Ative, bloqueie ou estenda o acesso desta conta.</CardDescription>
+            </div>
+            <Badge variant="outline" className={statusColors[status]}>
+              {statusLabels[status]}
+            </Badge>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {/* Subscription dates */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <div className="text-xs text-muted-foreground mb-1">Trial até</div>
+              <div className="font-medium">{formatDate(sub?.trialEndsAt ?? account.trialEndsAt)}</div>
+            </div>
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <div className="text-xs text-muted-foreground mb-1">Período atual até</div>
+              <div className="font-medium">{formatDate(sub?.currentPeriodEnd ?? account.currentPeriodEnd)}</div>
+            </div>
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <div className="text-xs text-muted-foreground mb-1">Cancelada em</div>
+              <div className="font-medium">{formatDate(sub?.canceledAt ?? null)}</div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              className="bg-success hover:bg-success/90 text-white"
+              onClick={() => { setSelectedMonths(1); setDialog("activate"); }}
+            >
+              <ShieldCheck className="h-4 w-4 mr-1.5" />
+              Ativar assinatura
+            </Button>
+
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-info/40 text-info hover:bg-info/10"
+              onClick={() => { setSelectedDays(7); setDialog("extend_trial"); }}
+            >
+              <CalendarClock className="h-4 w-4 mr-1.5" />
+              Estender trial
+            </Button>
+
+            {(isActive || isTrial) && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-destructive/40 text-destructive hover:bg-destructive/10 ml-auto"
+                onClick={() => setDialog("deactivate")}
+              >
+                <ShieldOff className="h-4 w-4 mr-1.5" />
+                Bloquear acesso
+              </Button>
+            )}
+          </div>
+
+          {isBlocked && (
+            <p className="text-xs text-destructive bg-destructive/8 rounded-lg px-3 py-2 flex items-center gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              Acesso bloqueado — o usuário vê erro 403 em todas as rotas protegidas.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Activate Dialog ── */}
+      <Dialog open={dialog === "activate"} onOpenChange={(open) => !open && setDialog(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ativar Assinatura</DialogTitle>
+            <DialogDescription>
+              Selecione a duração da ativação. O período começa a contar a partir de agora.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-2 gap-2 py-2">
+            {ACTIVATE_OPTIONS.map((opt) => (
+              <button
+                key={opt.months}
+                onClick={() => setSelectedMonths(opt.months)}
+                className={`rounded-xl border p-3 text-sm font-medium text-left transition-colors ${
+                  selectedMonths === opt.months
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border hover:border-primary/40 hover:bg-muted/50"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialog(null)} disabled={mutation.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-success hover:bg-success/90 text-white"
+              onClick={handleConfirm}
+              disabled={mutation.isPending}
+            >
+              {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
+              Confirmar ativação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Extend Trial Dialog ── */}
+      <Dialog open={dialog === "extend_trial"} onOpenChange={(open) => !open && setDialog(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Estender Trial</DialogTitle>
+            <DialogDescription>
+              Adiciona dias ao trial. Se o trial já expirou, o novo prazo começa hoje.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-3 gap-2 py-2">
+            {TRIAL_OPTIONS.map((opt) => (
+              <button
+                key={opt.days}
+                onClick={() => setSelectedDays(opt.days)}
+                className={`rounded-xl border p-3 text-sm font-medium text-center transition-colors ${
+                  selectedDays === opt.days
+                    ? "border-info bg-info/10 text-info"
+                    : "border-border hover:border-info/40 hover:bg-muted/50"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialog(null)} disabled={mutation.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-info hover:bg-info/90 text-white"
+              onClick={handleConfirm}
+              disabled={mutation.isPending}
+            >
+              {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CalendarClock className="h-4 w-4 mr-2" />}
+              Confirmar extensão
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Deactivate Dialog ── */}
+      <Dialog open={dialog === "deactivate"} onOpenChange={(open) => !open && setDialog(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Bloquear Acesso</DialogTitle>
+            <DialogDescription>
+              Esta ação marca a assinatura como expirada imediatamente. O usuário perderá o acesso a
+              todas as funcionalidades da plataforma.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Alert variant="destructive" className="text-sm">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Atenção</AlertTitle>
+            <AlertDescription>
+              A conta <strong>{account.clinicName}</strong> ficará bloqueada até que a assinatura
+              seja reativada manualmente ou pelo próprio usuário.
+            </AlertDescription>
+          </Alert>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialog(null)} disabled={mutation.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirm}
+              disabled={mutation.isPending}
+            >
+              {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldOff className="h-4 w-4 mr-2" />}
+              Bloquear acesso
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function AdminAccountDetailPage() {
   const params = useParams<{ accountId: string }>();
   const accountId = Array.isArray(params.accountId) ? params.accountId[0] : params.accountId;
+  const queryClient = useQueryClient();
   const { data, isLoading, isError, refetch } = useAdminAccountDetail(accountId);
+
+  function invalidateAll() {
+    queryClient.invalidateQueries({ queryKey: adminKeys.accountDetail(accountId) });
+    queryClient.invalidateQueries({ queryKey: adminKeys.overview() });
+  }
 
   if (isLoading) {
     return (
@@ -100,10 +404,22 @@ export default function AdminAccountDetailPage() {
           </div>
         </div>
 
-        <Badge variant="outline" className={statusColors[account.subscriptionStatus]}>
-          {statusLabels[account.subscriptionStatus]}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className={statusColors[account.subscriptionStatus]}>
+            {statusLabels[account.subscriptionStatus]}
+          </Badge>
+          <Button variant="ghost" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
+
+      {/* Subscription management card */}
+      <SubscriptionManagementCard
+        accountId={accountId}
+        account={account}
+        onSuccess={invalidateAll}
+      />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
