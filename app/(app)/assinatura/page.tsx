@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 import { subscriptionService } from "@/services/subscription.service";
 import {
   Card,
@@ -24,7 +23,6 @@ import {
   ShieldCheck,
   Clock,
   XCircle,
-  Info,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -158,13 +156,12 @@ function TrialProgressCard({ trialEndsAt }: { trialEndsAt: string }) {
 export default function SubscriptionPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [needsManualConfirm, setNeedsManualConfirm] = useState(false);
 
   const { data: subscription, isLoading, error } = useQuery({
     queryKey: ["subscription"],
     queryFn: subscriptionService.getSubscription,
     retry: 1,
-    refetchInterval: 60_000, // refresh every minute to keep countdown current
+    refetchInterval: 60_000,
   });
 
   const createPaymentMutation = useMutation({
@@ -172,7 +169,7 @@ export default function SubscriptionPage() {
     onSuccess: (data) => {
       window.open(data.payment_url, "_blank");
       queryClient.invalidateQueries({ queryKey: ["subscription"] });
-      toast({ title: "Pagamento iniciado", description: "Você será redirecionado para a página de pagamento." });
+      toast({ title: "Pagamento iniciado", description: "Conclua o pagamento na página aberta. Seu acesso será liberado automaticamente." });
     },
     onError: () => {
       toast({ title: "Erro ao criar pagamento", description: "Tente novamente em instantes.", variant: "destructive" });
@@ -194,34 +191,17 @@ export default function SubscriptionPage() {
     mutationFn: subscriptionService.checkPaymentStatus,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["subscription"] });
-      if (data.requires_manual_confirmation) {
-        setNeedsManualConfirm(true);
-        toast({
-          title: "Verificação automática indisponível",
-          description: "Se você já realizou o pagamento, use o botão de confirmação manual abaixo.",
-          variant: "destructive",
-        });
-      } else if (data.subscription?.status === "active") {
-        setNeedsManualConfirm(false);
+      if (data.subscription?.status === "active") {
         toast({ title: "Pagamento confirmado!", description: "Sua assinatura foi ativada com sucesso." });
       } else {
-        toast({ title: data.message || "Aguardando pagamento", description: "Nenhuma confirmação recebida ainda." });
+        toast({
+          title: "Pagamento ainda não confirmado",
+          description: data.message || "Se você já pagou, aguarde alguns minutos e tente novamente. Em caso de dúvida, entre em contato com o suporte.",
+        });
       }
     },
     onError: () => {
       toast({ title: "Não foi possível verificar o pagamento.", variant: "destructive" });
-    },
-  });
-
-  const confirmPaymentMutation = useMutation({
-    mutationFn: subscriptionService.confirmPayment,
-    onSuccess: () => {
-      setNeedsManualConfirm(false);
-      queryClient.invalidateQueries({ queryKey: ["subscription"] });
-      toast({ title: "Assinatura ativada!", description: "Seu acesso foi liberado com sucesso." });
-    },
-    onError: () => {
-      toast({ title: "Erro ao confirmar pagamento.", description: "Tente novamente ou entre em contato com o suporte.", variant: "destructive" });
     },
   });
 
@@ -265,7 +245,9 @@ export default function SubscriptionPage() {
   const isOnTrial      = subscription.is_on_trial;
   // Show payment button for every non-active state except voluntarily canceled.
   // This covers: ongoing trial, expired trial, expired (admin block), past_due.
-  const needsPayment   = !subscription.is_active && subscription.status !== "canceled";
+  // Show payment button for all non-active states, including canceled (re-subscribe flow).
+  // The webhook handles activation for any status, so allowing payment here is safe.
+  const needsPayment   = !subscription.is_active;
   const hasPending     = subscription.transactions?.some((t) => t.status === "pending");
 
   return (
@@ -324,7 +306,7 @@ export default function SubscriptionPage() {
           <AlertCircle className="h-4 w-4 text-gray-500" />
           <AlertTitle className="text-gray-700">Assinatura Cancelada</AlertTitle>
           <AlertDescription className="text-gray-600">
-            Clique em &ldquo;Reativar&rdquo; para ganhar 7 dias de teste e voltar a usar o DrVet.
+            Sua assinatura foi cancelada. Clique em &ldquo;Adicionar Pagamento&rdquo; abaixo para reativar o acesso.
           </AlertDescription>
         </Alert>
       )}
@@ -374,17 +356,6 @@ export default function SubscriptionPage() {
 
           <Separator />
 
-          {/* Manual confirmation alert */}
-          {needsManualConfirm && (
-            <Alert className="border-warning/30 bg-warning/8">
-              <Info className="h-4 w-4 text-[color:var(--warning)]" />
-              <AlertTitle className="text-[color:var(--warning)]">Confirme seu pagamento</AlertTitle>
-              <AlertDescription className="text-[color:var(--warning)]">
-                Não conseguimos verificar seu pagamento automaticamente. Se você já realizou o pagamento via PIX ou cartão, clique em <strong>Confirmar Pagamento</strong> abaixo para liberar seu acesso.
-              </AlertDescription>
-            </Alert>
-          )}
-
           {/* Actions */}
           <div className="flex flex-wrap gap-3">
             {needsPayment && (
@@ -408,18 +379,6 @@ export default function SubscriptionPage() {
                 {checkPaymentMutation.isPending
                   ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Verificando...</>
                   : <><Clock className="w-4 h-4 mr-2" />Verificar Pagamento</>}
-              </Button>
-            )}
-
-            {needsManualConfirm && hasPending && (
-              <Button
-                onClick={() => confirmPaymentMutation.mutate()}
-                disabled={confirmPaymentMutation.isPending}
-                className="bg-warning text-white hover:bg-warning/90"
-              >
-                {confirmPaymentMutation.isPending
-                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Confirmando...</>
-                  : <><CheckCircle2 className="w-4 h-4 mr-2" />Confirmar Pagamento</>}
               </Button>
             )}
 
