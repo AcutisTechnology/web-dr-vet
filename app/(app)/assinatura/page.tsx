@@ -167,9 +167,9 @@ export default function SubscriptionPage() {
   const createPaymentMutation = useMutation({
     mutationFn: subscriptionService.createPayment,
     onSuccess: (data) => {
-      window.open(data.payment_url, "_blank");
-      queryClient.invalidateQueries({ queryKey: ["subscription"] });
-      toast({ title: "Pagamento iniciado", description: "Conclua o pagamento na página aberta. Seu acesso será liberado automaticamente." });
+      // Redirect in the same tab — window.open("_blank") from async callbacks
+      // is blocked by browser popup blockers. The user returns via completionUrl.
+      window.location.href = data.payment_url;
     },
     onError: () => {
       toast({ title: "Erro ao criar pagamento", description: "Tente novamente em instantes.", variant: "destructive" });
