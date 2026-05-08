@@ -12,6 +12,11 @@ export const authService = {
     return data;
   },
 
+  googleLogin: async (payload: { access_token: string }): Promise<AuthResponse> => {
+    const { data } = await apiClient.post<AuthResponse>("/auth/google", payload);
+    return data;
+  },
+
   logout: async (): Promise<void> => {
     await apiClient.post("/logout");
   },
