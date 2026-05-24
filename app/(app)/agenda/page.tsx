@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -84,11 +85,13 @@ export default function AgendaPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAppt, setEditingAppt] = useState<Appointment | null>(null);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [form, setForm] = useState({
     clientId: "",
     petId: "",
     vetId: "",
     serviceType: "Consulta",
+    status: "scheduled" as string,
     date: format(new Date(), "yyyy-MM-dd"),
     startTime: "09:00",
     duration: "30",
@@ -146,6 +149,7 @@ export default function AgendaPage() {
       petId: "",
       vetId: user?.id ?? "",
       serviceType: "Consulta",
+      status: "scheduled",
       date: format(currentDate, "yyyy-MM-dd"),
       startTime: "09:00",
       duration: "30",
@@ -164,6 +168,7 @@ export default function AgendaPage() {
       petId: appt.petId,
       vetId: appt.vetId ?? "",
       serviceType: appt.serviceType,
+      status: appt.status,
       date: appt.date.split("T")[0],
       startTime: appt.startTime,
       duration: String(appt.duration),
@@ -187,7 +192,7 @@ export default function AgendaPage() {
       pet_id: form.petId,
       vet_id: form.vetId || undefined,
       service_type: form.serviceType,
-      status: "scheduled" as const,
+      status: editingAppt ? form.status : "scheduled",
       date: form.date,
       start_time: form.startTime,
       end_time: calcEndTime(form.startTime, dur),
@@ -220,6 +225,23 @@ export default function AgendaPage() {
           toast({ title: "Erro ao criar agendamento", variant: "destructive" }),
       });
     }
+  };
+
+  // ── Cancel ────────────────────────────────────────────────────────────────
+  const handleCancelAppointment = () => {
+    if (!editingAppt) return;
+    updateAppt.mutate(
+      { id: editingAppt.id, payload: { status: "cancelled" } },
+      {
+        onSuccess: () => {
+          toast({ title: "Agendamento cancelado" });
+          setCancelConfirmOpen(false);
+          setDialogOpen(false);
+        },
+        onError: () =>
+          toast({ title: "Erro ao cancelar agendamento", variant: "destructive" }),
+      },
+    );
   };
 
   // ── Print ─────────────────────────────────────────────────────────────────
@@ -550,6 +572,27 @@ export default function AgendaPage() {
                 />
               </div>
             </div>
+            {editingAppt && (
+              <div className="space-y-1.5">
+                <Label>Status do agendamento</Label>
+                <Select
+                  value={form.status}
+                  onValueChange={(v) => setForm((f) => ({ ...f, status: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="scheduled">Agendado</SelectItem>
+                    <SelectItem value="confirmed">Confirmado</SelectItem>
+                    <SelectItem value="in_progress">Em atendimento</SelectItem>
+                    <SelectItem value="completed">Concluído</SelectItem>
+                    <SelectItem value="cancelled">Cancelado</SelectItem>
+                    <SelectItem value="no_show">Não compareceu</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label>Observações</Label>
               <Textarea
@@ -591,12 +634,47 @@ export default function AgendaPage() {
               )}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
+            {editingAppt && editingAppt.status !== "cancelled" && (
+              <Button
+                variant="destructive"
+                size="sm"
+                className="sm:mr-auto"
+                onClick={() => setCancelConfirmOpen(true)}
+                disabled={isSaving}
+              >
+                Cancelar Agendamento
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancelar
+              Fechar
             </Button>
             <Button onClick={handleSave} disabled={isSaving}>
               {isSaving ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmação de cancelamento */}
+      <Dialog open={cancelConfirmOpen} onOpenChange={setCancelConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Cancelar agendamento?</DialogTitle>
+            <DialogDescription>
+              Esta ação marcará o agendamento como cancelado. O registro será mantido no histórico.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setCancelConfirmOpen(false)}>
+              Voltar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleCancelAppointment}
+              disabled={updateAppt.isPending}
+            >
+              {updateAppt.isPending ? "Cancelando..." : "Confirmar cancelamento"}
             </Button>
           </DialogFooter>
         </DialogContent>

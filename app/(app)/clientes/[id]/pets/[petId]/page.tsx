@@ -24,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -72,6 +72,16 @@ interface PrescriptionDraftItem {
   quantity: string;
   route: string;
   notes: string;
+}
+
+interface CompoundPrescriptionDraftItem {
+  principioAtivo: string;
+  concentracao: string;
+  veiculo: string;
+  formaFarmaceutica: string;
+  quantidade: string;
+  posologia: string;
+  notasFarmaceutico: string;
 }
 
 interface PrescriptionPrintMeta {
@@ -124,6 +134,23 @@ function parsePrescriptionItems(value: unknown): PrescriptionDraftItem[] {
       notes: typeof item.notes === "string" ? item.notes : "",
     }))
     .filter((item) => item.medication.trim().length > 0);
+}
+
+function parseCompoundPrescriptionItems(value: unknown): CompoundPrescriptionDraftItem[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter(isRecord)
+    .map((item) => ({
+      principioAtivo: typeof item.principioAtivo === "string" ? item.principioAtivo : "",
+      concentracao: typeof item.concentracao === "string" ? item.concentracao : "",
+      veiculo: typeof item.veiculo === "string" ? item.veiculo : "",
+      formaFarmaceutica: typeof item.formaFarmaceutica === "string" ? item.formaFarmaceutica : "",
+      quantidade: typeof item.quantidade === "string" ? item.quantidade : "",
+      posologia: typeof item.posologia === "string" ? item.posologia : "",
+      notasFarmaceutico: typeof item.notasFarmaceutico === "string" ? item.notasFarmaceutico : "",
+    }))
+    .filter((item) => item.principioAtivo.trim().length > 0);
 }
 
 const EMPTY_AN: PetAnamnesis = {
@@ -305,6 +332,7 @@ const EVT_LBL: Record<string, string> = {
   vaccine: "Vacina",
   exam: "Exame",
   prescription: "Receita",
+  compound_prescription: "Receita de Manipulação",
   observation: "Observação",
   weight: "Pesagem",
   surgery: "Cirurgia",
@@ -473,6 +501,7 @@ const EVT_CLR: Record<string, string> = {
   vaccine: "bg-success/12 text-success",
   exam: "bg-secondary text-secondary-foreground",
   prescription: "bg-warning/12 text-[color:var(--warning)]",
+  compound_prescription: "bg-purple-100 text-purple-700",
   observation: "bg-muted text-foreground",
   weight: "bg-accent/15 text-primary",
   surgery: "bg-destructive/12 text-destructive",
@@ -605,6 +634,29 @@ export default function PetDetailPage() {
     ],
     rxNotes: "",
   });
+  const [prescriptionType, setPrescriptionType] = useState<"simples" | "manipulacao">("simples");
+  const [compoundRx, setCompoundRx] = useState({
+    vetName: "",
+    vetCrmv: "",
+    clinicName: "DrVet",
+    clinicAddress: "",
+    clinicPhone: "",
+    date: new Date().toISOString().split("T")[0],
+    farmaciaManipulacao: "",
+    items: [
+      {
+        principioAtivo: "",
+        concentracao: "",
+        veiculo: "",
+        formaFarmaceutica: "",
+        quantidade: "",
+        posologia: "",
+        notasFarmaceutico: "",
+      },
+    ] as CompoundPrescriptionDraftItem[],
+    observacoes: "",
+  });
+  const [savingCompoundPrescription, setSavingCompoundPrescription] = useState(false);
   const [examDialogOpen, setExamDialogOpen] = useState(false);
   const [editingExamEventId, setEditingExamEventId] = useState<string | null>(null);
   const [savingExam, setSavingExam] = useState(false);
@@ -664,6 +716,13 @@ export default function PetDetailPage() {
 
   useEffect(() => {
     setRx((current) => ({
+      ...current,
+      vetName: current.vetName || currentUser?.name || "",
+      clinicName: current.clinicName === "DrVet" && currentUser?.clinicName
+        ? currentUser.clinicName
+        : current.clinicName,
+    }));
+    setCompoundRx((current) => ({
       ...current,
       vetName: current.vetName || currentUser?.name || "",
       clinicName: current.clinicName === "DrVet" && currentUser?.clinicName
@@ -1345,6 +1404,131 @@ export default function PetDetailPage() {
       printedAt: event.date,
     });
   };
+
+  const handlePrintCompoundRx = () => {
+    if (!pet || !client) return;
+    const items = compoundRx.items.filter((it) => it.principioAtivo.trim());
+    if (items.length === 0) {
+      toast({ title: "Adicione ao menos um princípio ativo à receita de manipulação", variant: "destructive" });
+      return;
+    }
+    const win = window.open("", "_blank");
+    if (!win) return;
+    const userLogoUrl = currentUser?.id ? getLogo(currentUser.id) : null;
+    const clinicDisplayName = compoundRx.clinicName || currentUser?.clinicName || "DrVet";
+    const doctorName = compoundRx.vetName || currentUser?.name || "Médico(a) Veterinário(a)";
+
+    const css = `
+      @page{size:A5 portrait;margin:0}
+      *{box-sizing:border-box;margin:0;padding:0}
+      html,body{width:148mm;min-height:210mm}
+      body{font-family:'Poppins',Arial,sans-serif;background:#eef2f7;color:#14213d;padding:12px}
+      .sheet{width:100%;max-width:148mm;min-height:calc(210mm - 24px);margin:0 auto;background:#fff;border:1px solid #d8e0ec;border-radius:18px;overflow:hidden;box-shadow:0 18px 48px rgba(15,23,42,.08)}
+      .top-band{height:10px;background:linear-gradient(90deg,#6b21a8,#9333ea)}
+      .page{padding:20px 18px 18px}
+      .header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding-bottom:14px;border-bottom:1px solid #dbe4f0}
+      .logo-area{display:flex;gap:14px;align-items:center}
+      .logo-img{width:46px;height:46px;object-fit:contain;border-radius:12px;border:1px solid #dbe4f0;padding:5px;background:#fff}
+      .logo-mark{font-size:20px;font-weight:800;color:#6b21a8;letter-spacing:-.03em;line-height:1.1}
+      .logo-mark span{color:#9333ea}
+      .logo-sub{font-size:9px;color:#64748b;margin-top:3px}
+      .clinic-info{text-align:right;font-size:9px;color:#475569;line-height:1.5;max-width:180px}
+      .clinic-name{font-size:11px;font-weight:700;color:#0f172a;margin-bottom:2px}
+      .title-box{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin:14px 0 12px}
+      .title{font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#0f172a}
+      .title-note{font-size:9px;color:#64748b;margin-top:3px}
+      .date-chip{border:1px solid #dbe4f0;border-radius:999px;padding:6px 9px;font-size:9px;color:#334155;background:#f8fafc;white-space:nowrap}
+      .badge-manipulacao{display:inline-block;background:#f3e8ff;color:#7e22ce;border:1px solid #d8b4fe;border-radius:999px;padding:3px 10px;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px}
+      .patient{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:14px;padding:12px 14px;margin-bottom:14px}
+      .field-label{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:700;margin-bottom:4px}
+      .field-value{font-size:11px;font-weight:600;color:#0f172a;line-height:1.35}
+      .section{margin-top:12px}
+      .section-title{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6b21a8;margin-bottom:8px}
+      .items{display:flex;flex-direction:column;gap:8px}
+      .item{padding:10px 12px;border:1px solid #e9d5ff;border-radius:12px;background:#faf5ff}
+      .item-index{display:inline-flex;width:22px;height:22px;border-radius:999px;background:#6b21a8;color:#fff;font-size:10px;font-weight:800;align-items:center;justify-content:center;margin-bottom:6px}
+      .item-title{font-size:12px;font-weight:800;color:#0f172a;margin-bottom:4px;line-height:1.3}
+      .item-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:9px;color:#475569;line-height:1.55}
+      .item-grid strong{color:#334155}
+      .item-full{grid-column:1/-1}
+      .item-note{margin-top:5px;font-size:9px;color:#7e22ce;font-style:italic;line-height:1.45;border-top:1px solid #e9d5ff;padding-top:4px}
+      .farmacia-box{margin-top:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;font-size:9px;color:#334155}
+      .farmacia-box strong{font-size:10px;color:#0f172a}
+      .observations{margin-top:12px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;padding:10px 12px;font-size:10px;line-height:1.6;white-space:pre-wrap;color:#334155}
+      .footer{margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+      .signature{padding-top:8px;border-top:1px solid #475569;text-align:center;font-size:9px;color:#334155;min-height:44px}
+      .signature strong{display:block;font-size:10px;color:#0f172a;margin-bottom:2px}
+      .footnote{margin-top:12px;padding-top:8px;border-top:1px solid #e2e8f0;font-size:8px;color:#64748b;text-align:center}
+      @media print{html,body{width:148mm;min-height:210mm;background:#fff;padding:0}.sheet{width:148mm;min-height:210mm;box-shadow:none;border:none;border-radius:0}.page{padding:18px 16px 14px}}
+    `;
+
+    const itemsHtml = items.map((item, i) => {
+      const grid = [
+        item.concentracao && `<div><strong>Concentração:</strong> ${escapeHtml(item.concentracao)}</div>`,
+        item.veiculo && `<div><strong>Veículo/Base:</strong> ${escapeHtml(item.veiculo)}</div>`,
+        item.formaFarmaceutica && `<div><strong>Forma farmacêutica:</strong> ${escapeHtml(item.formaFarmaceutica)}</div>`,
+        item.quantidade && `<div><strong>Quantidade:</strong> ${escapeHtml(item.quantidade)}</div>`,
+        item.posologia && `<div class="item-full"><strong>Posologia:</strong> ${escapeHtml(item.posologia)}</div>`,
+      ].filter(Boolean).join("");
+
+      return `
+        <div class="item">
+          <div class="item-index">${i + 1}</div>
+          <div class="item-title">${escapeHtml(item.principioAtivo)}</div>
+          <div class="item-grid">${grid}</div>
+          ${item.notasFarmaceutico ? `<div class="item-note"><strong>Nota ao farmacêutico:</strong> ${escapeHtml(item.notasFarmaceutico)}</div>` : ""}
+        </div>`;
+    }).join("");
+
+    const logoHtml = userLogoUrl
+      ? `<div class="logo-area"><img src="${escapeHtml(userLogoUrl)}" alt="Logo" class="logo-img"/><div><div class="logo-mark">${escapeHtml(clinicDisplayName)}</div><div class="logo-sub">Receituário de manipulação veterinária</div></div></div>`
+      : `<div class="logo-area"><div><div class="logo-mark">Dr<span>Vet</span></div><div class="logo-sub">${escapeHtml(clinicDisplayName)}</div></div></div>`;
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receita de Manipulação – ${escapeHtml(pet.name)}</title><style>${css}</style></head><body><div class="sheet"><div class="top-band"></div><div class="page"><div class="header">${logoHtml}<div class="clinic-info"><div class="clinic-name">${escapeHtml(clinicDisplayName)}</div>${compoundRx.clinicAddress ? `${escapeHtml(compoundRx.clinicAddress)}<br/>` : ""}${compoundRx.clinicPhone ? `Tel: ${escapeHtml(compoundRx.clinicPhone)}<br/>` : ""}${doctorName ? `Vet: ${escapeHtml(doctorName)}<br/>` : ""}${compoundRx.vetCrmv ? `CRMV: ${escapeHtml(compoundRx.vetCrmv)}` : ""}</div></div><div class="title-box"><div><div class="title">Receita de Manipulação Veterinária</div><div class="title-note">Destinada exclusivamente à farmácia de manipulação.</div></div><div class="date-chip">Emissão: ${escapeHtml(formatDate(compoundRx.date || new Date().toISOString()))}</div></div><span class="badge-manipulacao">Fórmula magistral</span><div class="patient"><div><div class="field-label">Paciente</div><div class="field-value">${escapeHtml(pet.name)}</div></div><div><div class="field-label">Tutor</div><div class="field-value">${escapeHtml(client.name)}</div></div><div><div class="field-label">Espécie / Raça</div><div class="field-value">${escapeHtml(`${SP[pet.species]} / ${pet.breed || "Não informada"}`)}</div></div><div><div class="field-label">Peso</div><div class="field-value">${escapeHtml(pet.weight ? `${pet.weight} kg` : "Não informado")}</div></div></div><div class="section"><div class="section-title">Fórmulas prescritas</div><div class="items">${itemsHtml}</div></div>${compoundRx.farmaciaManipulacao ? `<div class="farmacia-box"><strong>Farmácia designada:</strong> ${escapeHtml(compoundRx.farmaciaManipulacao)}</div>` : ""}${compoundRx.observacoes ? `<div class="observations"><strong>Observações gerais</strong><br/>${escapeHtml(compoundRx.observacoes)}</div>` : ""}<div class="footer"><div class="signature"><strong>${escapeHtml(doctorName)}</strong>${compoundRx.vetCrmv ? `CRMV: ${escapeHtml(compoundRx.vetCrmv)}` : "CRMV: ____________________"}</div><div class="signature"><strong>Assinatura e carimbo</strong>&nbsp;</div></div><div class="footnote">Impresso em ${escapeHtml(new Date().toLocaleString("pt-BR"))} • Documento gerado pela plataforma DrVet</div></div></div></body></html>`;
+
+    win.document.write(html);
+    win.document.close();
+    win.print();
+  };
+
+  const handleSaveCompoundPrescription = async () => {
+    if (!pet) return;
+    const items = compoundRx.items.filter((it) => it.principioAtivo.trim());
+    if (items.length === 0) {
+      toast({ title: "Adicione ao menos um princípio ativo à receita de manipulação", variant: "destructive" });
+      return;
+    }
+    try {
+      setSavingCompoundPrescription(true);
+      await medicalEventService.create({
+        pet_id: pet.id,
+        type: "compound_prescription",
+        date: compoundRx.date || new Date().toISOString().split("T")[0],
+        title: `Receita de Manipulação - ${pet.name} - ${formatDate(compoundRx.date || new Date().toISOString())}`,
+        description: `${items.length} ${items.length === 1 ? "fórmula prescrita" : "fórmulas prescritas"}`,
+        notes: compoundRx.observacoes || undefined,
+        prescription_items: items,
+        medications: {
+          vetName: compoundRx.vetName || currentUser?.name || "",
+          vetCrmv: compoundRx.vetCrmv,
+          clinicName: compoundRx.clinicName || currentUser?.clinicName || "",
+          clinicAddress: compoundRx.clinicAddress,
+          clinicPhone: compoundRx.clinicPhone,
+          issueDate: compoundRx.date || new Date().toISOString().split("T")[0],
+          farmaciaManipulacao: compoundRx.farmaciaManipulacao,
+          rxNotes: compoundRx.observacoes,
+        },
+      });
+      qc.invalidateQueries({ queryKey: ["medical-events", petId] });
+      setActiveTab("prontuario");
+      toast({ title: "Receita de manipulação salva no prontuário com sucesso" });
+    } catch {
+      toast({ title: "Erro ao salvar receita de manipulação", variant: "destructive" });
+    } finally {
+      setSavingCompoundPrescription(false);
+    }
+  };
+
   const handlePrintAnamnesis = () => {
     if (!pet || !client) return;
     const win = window.open("", "_blank");
@@ -2607,27 +2791,270 @@ ${r("Observações clínicas", an.clinicalObservations)}
           {/* RECEITUÁRIO */}
           <TabsContent value="receituario">
             <div className="space-y-4">
+              {/* Header com seletor de tipo de receita */}
               <div className="flex items-center justify-between flex-wrap gap-2">
-                <p className="text-sm font-medium">
-                  Receituário de{" "}
-                  <span className="text-primary font-semibold">{pet.name}</span>
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleSavePrescription}
-                    disabled={savingPrescription}
-                  >
-                    <Save className="w-4 h-4 mr-1" />
-                    {savingPrescription ? "Salvando..." : "Salvar no prontuário"}
-                  </Button>
-                  <Button size="sm" onClick={handlePrintRx}>
-                    <Printer className="w-4 h-4 mr-1" />
-                    Imprimir Receita
-                  </Button>
+                <div className="flex items-center gap-3">
+                  <p className="text-sm font-medium">
+                    Receituário de{" "}
+                    <span className="text-primary font-semibold">{pet.name}</span>
+                  </p>
+                  <Tabs value={prescriptionType} onValueChange={(v) => setPrescriptionType(v as "simples" | "manipulacao")}>
+                    <TabsList className="h-8">
+                      <TabsTrigger value="simples" className="text-xs px-3 h-6">Receita Simples</TabsTrigger>
+                      <TabsTrigger value="manipulacao" className="text-xs px-3 h-6">Manipulação</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
                 </div>
+                {prescriptionType === "simples" ? (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSavePrescription}
+                      disabled={savingPrescription}
+                    >
+                      <Save className="w-4 h-4 mr-1" />
+                      {savingPrescription ? "Salvando..." : "Salvar no prontuário"}
+                    </Button>
+                    <Button size="sm" onClick={handlePrintRx}>
+                      <Printer className="w-4 h-4 mr-1" />
+                      Imprimir Receita
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSaveCompoundPrescription}
+                      disabled={savingCompoundPrescription}
+                    >
+                      <Save className="w-4 h-4 mr-1" />
+                      {savingCompoundPrescription ? "Salvando..." : "Salvar no prontuário"}
+                    </Button>
+                    <Button size="sm" onClick={handlePrintCompoundRx}>
+                      <Printer className="w-4 h-4 mr-1" />
+                      Imprimir Receita
+                    </Button>
+                  </div>
+                )}
               </div>
+
+              {prescriptionType === "manipulacao" && (
+                <div className="space-y-4">
+                  {/* Cabeçalho da clínica - Manipulação */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <span className="inline-block w-2 h-2 rounded-full bg-purple-500" />
+                        Dados da Clínica / Veterinário
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        <div className="space-y-1.5">
+                          <Label>Clínica</Label>
+                          <Input value={compoundRx.clinicName} onChange={(e) => setCompoundRx((r) => ({ ...r, clinicName: e.target.value }))} placeholder="DrVet" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Endereço</Label>
+                          <Input value={compoundRx.clinicAddress} onChange={(e) => setCompoundRx((r) => ({ ...r, clinicAddress: e.target.value }))} placeholder="Rua, número..." />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Telefone</Label>
+                          <Input value={compoundRx.clinicPhone} onChange={(e) => setCompoundRx((r) => ({ ...r, clinicPhone: e.target.value }))} placeholder="(00) 0000-0000" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Veterinário responsável</Label>
+                          <Input value={compoundRx.vetName} onChange={(e) => setCompoundRx((r) => ({ ...r, vetName: e.target.value }))} placeholder="Dr(a). Nome" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>CRMV</Label>
+                          <Input value={compoundRx.vetCrmv} onChange={(e) => setCompoundRx((r) => ({ ...r, vetCrmv: e.target.value }))} placeholder="CRMV-XX 00000" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Data de emissão</Label>
+                          <Input type="date" value={compoundRx.date} onChange={(e) => setCompoundRx((r) => ({ ...r, date: e.target.value }))} />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Farmácia de manipulação */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Farmácia de Manipulação</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Input
+                        value={compoundRx.farmaciaManipulacao}
+                        onChange={(e) => setCompoundRx((r) => ({ ...r, farmaciaManipulacao: e.target.value }))}
+                        placeholder="Nome da farmácia de manipulação designada (opcional)"
+                      />
+                    </CardContent>
+                  </Card>
+
+                  {/* Fórmulas */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Fórmulas Magistrais</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {compoundRx.items.map((item, idx) => (
+                        <div key={idx} className="border rounded-lg p-4 space-y-3 bg-purple-50/40">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-purple-700">Fórmula {idx + 1}</span>
+                            {compoundRx.items.length > 1 && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-destructive"
+                                onClick={() => setCompoundRx((r) => ({ ...r, items: r.items.filter((_, i) => i !== idx) }))}
+                              >
+                                <span className="text-base leading-none">&times;</span>
+                              </Button>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="space-y-1.5 sm:col-span-2">
+                              <Label>Princípio ativo *</Label>
+                              <Input
+                                value={item.principioAtivo}
+                                onChange={(e) => setCompoundRx((r) => { const items = [...r.items]; items[idx] = { ...items[idx], principioAtivo: e.target.value }; return { ...r, items }; })}
+                                placeholder="Ex: Metronidazol, Amoxicilina..."
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Concentração</Label>
+                              <Input
+                                value={item.concentracao}
+                                onChange={(e) => setCompoundRx((r) => { const items = [...r.items]; items[idx] = { ...items[idx], concentracao: e.target.value }; return { ...r, items }; })}
+                                placeholder="Ex: 50mg/mL, 10%"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Veículo / Base</Label>
+                              <Input
+                                value={item.veiculo}
+                                onChange={(e) => setCompoundRx((r) => { const items = [...r.items]; items[idx] = { ...items[idx], veiculo: e.target.value }; return { ...r, items }; })}
+                                placeholder="Ex: Creme base hidrofílica, suspensão"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Forma farmacêutica</Label>
+                              <Select
+                                value={item.formaFarmaceutica || "__none__"}
+                                onValueChange={(v) => setCompoundRx((r) => { const items = [...r.items]; items[idx] = { ...items[idx], formaFarmaceutica: v === "__none__" ? "" : v }; return { ...r, items }; })}
+                              >
+                                <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__none__">Não especificado</SelectItem>
+                                  <SelectItem value="Cápsulas">Cápsulas</SelectItem>
+                                  <SelectItem value="Comprimidos">Comprimidos</SelectItem>
+                                  <SelectItem value="Solução oral">Solução oral</SelectItem>
+                                  <SelectItem value="Suspensão oral">Suspensão oral</SelectItem>
+                                  <SelectItem value="Creme">Creme</SelectItem>
+                                  <SelectItem value="Pomada">Pomada</SelectItem>
+                                  <SelectItem value="Gel">Gel</SelectItem>
+                                  <SelectItem value="Xarope">Xarope</SelectItem>
+                                  <SelectItem value="Injetável">Injetável</SelectItem>
+                                  <SelectItem value="Colírio">Colírio</SelectItem>
+                                  <SelectItem value="Supositório">Supositório</SelectItem>
+                                  <SelectItem value="Outro">Outro</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Quantidade</Label>
+                              <Input
+                                value={item.quantidade}
+                                onChange={(e) => setCompoundRx((r) => { const items = [...r.items]; items[idx] = { ...items[idx], quantidade: e.target.value }; return { ...r, items }; })}
+                                placeholder="Ex: 100g, 30 cápsulas, 120mL"
+                              />
+                            </div>
+                            <div className="space-y-1.5 sm:col-span-2">
+                              <Label>Posologia</Label>
+                              <Input
+                                value={item.posologia}
+                                onChange={(e) => setCompoundRx((r) => { const items = [...r.items]; items[idx] = { ...items[idx], posologia: e.target.value }; return { ...r, items }; })}
+                                placeholder="Ex: Aplicar 0,5mL a cada 12h por 7 dias"
+                              />
+                            </div>
+                            <div className="space-y-1.5 sm:col-span-2">
+                              <Label>Nota ao farmacêutico</Label>
+                              <Textarea
+                                value={item.notasFarmaceutico}
+                                onChange={(e) => setCompoundRx((r) => { const items = [...r.items]; items[idx] = { ...items[idx], notasFarmaceutico: e.target.value }; return { ...r, items }; })}
+                                rows={2}
+                                placeholder="Instruções especiais para o farmacêutico (opcional)"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCompoundRx((r) => ({ ...r, items: [...r.items, { principioAtivo: "", concentracao: "", veiculo: "", formaFarmaceutica: "", quantidade: "", posologia: "", notasFarmaceutico: "" }] }))}
+                      >
+                        + Adicionar fórmula
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  {/* Observações gerais */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Observações Gerais</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Textarea
+                        value={compoundRx.observacoes}
+                        onChange={(e) => setCompoundRx((r) => ({ ...r, observacoes: e.target.value }))}
+                        rows={3}
+                        placeholder="Observações adicionais para o tutor ou farmácia..."
+                      />
+                    </CardContent>
+                  </Card>
+
+                  {/* Preview da Receita de Manipulação */}
+                  {compoundRx.items.some((it) => it.principioAtivo.trim()) && (
+                    <Card className="border-purple-200 bg-purple-50/30">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm text-purple-700">Preview da Receita de Manipulação</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-xs space-y-1 text-muted-foreground">
+                          {compoundRx.clinicName && <p className="font-semibold text-foreground">{compoundRx.clinicName}</p>}
+                          {compoundRx.clinicAddress && <p>{compoundRx.clinicAddress}</p>}
+                          <p className="font-bold text-sm text-purple-800 mt-2">Receita de Manipulação Veterinária</p>
+                          <p><strong>Paciente:</strong> {pet.name} | <strong>Tutor:</strong> {client?.name}</p>
+                          {compoundRx.items.filter((it) => it.principioAtivo.trim()).map((it, i) => (
+                            <div key={i} className="mt-1 pl-2 border-l-2 border-purple-300">
+                              <p className="font-medium text-foreground">{i + 1}. {it.principioAtivo}</p>
+                              {it.concentracao && <p>Conc.: {it.concentracao}</p>}
+                              {it.formaFarmaceutica && <p>Forma: {it.formaFarmaceutica}</p>}
+                              {it.quantidade && <p>Qtd.: {it.quantidade}</p>}
+                              {it.posologia && <p>Posologia: {it.posologia}</p>}
+                            </div>
+                          ))}
+                          {compoundRx.observacoes && <p className="mt-2"><b>Obs.:</b> {compoundRx.observacoes}</p>}
+                          <div className="mt-4 grid grid-cols-2 gap-6 text-center">
+                            <div className="border-t border-gray-400 pt-1">
+                              {compoundRx.vetName || "Médico(a) Veterinário(a)"}
+                              <br />
+                              {compoundRx.vetCrmv ? `CRMV: ${compoundRx.vetCrmv}` : "CRMV: _______________"}
+                            </div>
+                            <div className="border-t border-gray-400 pt-1">Assinatura</div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
+
+              {prescriptionType === "simples" && (<div className="space-y-4">
               {/* Cabeçalho da clínica */}
               <Card>
                 <CardHeader className="pb-2">
@@ -3043,6 +3470,7 @@ ${r("Observações clínicas", an.clinicalObservations)}
                   </CardContent>
                 </Card>
               )}
+              </div>)}
             </div>
           </TabsContent>
 
@@ -3879,6 +4307,36 @@ ${r("Observações clínicas", an.clinicalObservations)}
                                             </div>
                                           );
                                         })()}
+                                        {event.type === "compound_prescription" && (() => {
+                                          const compoundItems = parseCompoundPrescriptionItems(event.prescription_items);
+                                          if (compoundItems.length === 0) return null;
+                                          return (
+                                            <div className="mt-2 rounded-xl border border-purple-200 bg-purple-50/50 p-3 space-y-2">
+                                              <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide">Fórmulas magistrais</p>
+                                              {compoundItems.map((item, index) => (
+                                                <div key={`${event.id}-cmp-${index}`} className="rounded-lg border border-purple-200/70 bg-white p-2.5">
+                                                  <p className="text-sm font-semibold text-foreground">{item.principioAtivo}</p>
+                                                  <p className="mt-1 text-xs text-muted-foreground">
+                                                    {[
+                                                      item.concentracao && `Conc.: ${item.concentracao}`,
+                                                      item.formaFarmaceutica && `Forma: ${item.formaFarmaceutica}`,
+                                                      item.quantidade && `Qtd.: ${item.quantidade}`,
+                                                    ].filter(Boolean).join(" · ")}
+                                                  </p>
+                                                  {item.posologia && (
+                                                    <p className="mt-1 text-xs text-muted-foreground"><strong>Posologia:</strong> {item.posologia}</p>
+                                                  )}
+                                                  {item.notasFarmaceutico && (
+                                                    <p className="mt-1 text-xs italic text-purple-600">{item.notasFarmaceutico}</p>
+                                                  )}
+                                                </div>
+                                              ))}
+                                              {event.notes && (
+                                                <p className="text-xs text-muted-foreground whitespace-pre-wrap"><strong>Observações:</strong> {event.notes}</p>
+                                              )}
+                                            </div>
+                                          );
+                                        })()}
                                         {event.description && (
                                           <p className="text-sm mt-2 text-gray-700">{event.description}</p>
                                         )}
@@ -3929,6 +4387,32 @@ ${r("Observações clínicas", an.clinicalObservations)}
                                       size="icon"
                                       onClick={() => handlePrintPrescription(event)}
                                       title="Imprimir receita"
+                                    >
+                                      <Printer className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                  {event.type === "compound_prescription" && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => {
+                                        if (!pet || !client) return;
+                                        const items = parseCompoundPrescriptionItems(event.prescription_items);
+                                        const meta = parsePrescriptionMeta(event.medications);
+                                        const win = window.open("", "_blank");
+                                        if (!win) return;
+                                        const clinicName = meta?.clinicName || currentUser?.clinicName || "DrVet";
+                                        const doctorName = meta?.vetName || event.vet?.name || currentUser?.name || "Médico(a) Veterinário(a)";
+                                        const userLogoUrl = currentUser?.id ? getLogo(currentUser.id) : null;
+                                        const css = `@page{size:A5 portrait;margin:0}*{box-sizing:border-box;margin:0;padding:0}html,body{width:148mm;min-height:210mm}body{font-family:'Poppins',Arial,sans-serif;background:#eef2f7;color:#14213d;padding:12px}.sheet{width:100%;max-width:148mm;min-height:calc(210mm - 24px);margin:0 auto;background:#fff;border:1px solid #d8e0ec;border-radius:18px;overflow:hidden}.top-band{height:10px;background:linear-gradient(90deg,#6b21a8,#9333ea)}.page{padding:20px 18px 18px}.header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding-bottom:14px;border-bottom:1px solid #dbe4f0}.logo-mark{font-size:20px;font-weight:800;color:#6b21a8}.logo-mark span{color:#9333ea}.logo-sub{font-size:9px;color:#64748b;margin-top:3px}.clinic-info{text-align:right;font-size:9px;color:#475569;line-height:1.5;max-width:180px}.clinic-name{font-size:11px;font-weight:700;color:#0f172a;margin-bottom:2px}.title-box{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin:14px 0 8px}.title{font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#0f172a}.date-chip{border:1px solid #dbe4f0;border-radius:999px;padding:6px 9px;font-size:9px;color:#334155;background:#f8fafc}.badge-manipulacao{display:inline-block;background:#f3e8ff;color:#7e22ce;border:1px solid #d8b4fe;border-radius:999px;padding:3px 10px;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px}.patient{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:14px;padding:12px 14px;margin-bottom:14px}.field-label{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:700;margin-bottom:4px}.field-value{font-size:11px;font-weight:600;color:#0f172a}.section-title{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6b21a8;margin:12px 0 8px}.items{display:flex;flex-direction:column;gap:8px}.item{padding:10px 12px;border:1px solid #e9d5ff;border-radius:12px;background:#faf5ff}.item-index{display:inline-flex;width:22px;height:22px;border-radius:999px;background:#6b21a8;color:#fff;font-size:10px;font-weight:800;align-items:center;justify-content:center;margin-bottom:6px}.item-title{font-size:12px;font-weight:800;color:#0f172a;margin-bottom:4px}.item-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:9px;color:#475569;line-height:1.55}.item-grid strong{color:#334155}.item-full{grid-column:1/-1}.item-note{margin-top:5px;font-size:9px;color:#7e22ce;font-style:italic;border-top:1px solid #e9d5ff;padding-top:4px}.footer{margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:14px}.signature{padding-top:8px;border-top:1px solid #475569;text-align:center;font-size:9px;color:#334155;min-height:44px}.signature strong{display:block;font-size:10px;color:#0f172a;margin-bottom:2px}.footnote{margin-top:12px;padding-top:8px;border-top:1px solid #e2e8f0;font-size:8px;color:#64748b;text-align:center}@media print{.sheet{width:148mm;min-height:210mm;box-shadow:none;border:none;border-radius:0}}`;
+                                        const itemsHtml = items.map((it, i) => `<div class="item"><div class="item-index">${i+1}</div><div class="item-title">${escapeHtml(it.principioAtivo)}</div><div class="item-grid">${[it.concentracao && `<div><strong>Concentração:</strong> ${escapeHtml(it.concentracao)}</div>`, it.veiculo && `<div><strong>Veículo:</strong> ${escapeHtml(it.veiculo)}</div>`, it.formaFarmaceutica && `<div><strong>Forma:</strong> ${escapeHtml(it.formaFarmaceutica)}</div>`, it.quantidade && `<div><strong>Qtd.:</strong> ${escapeHtml(it.quantidade)}</div>`, it.posologia && `<div class="item-full"><strong>Posologia:</strong> ${escapeHtml(it.posologia)}</div>`].filter(Boolean).join("")}</div>${it.notasFarmaceutico ? `<div class="item-note"><strong>Nota ao farmacêutico:</strong> ${escapeHtml(it.notasFarmaceutico)}</div>` : ""}</div>`).join("");
+                                        const logoHtml = userLogoUrl ? `<div style="display:flex;gap:14px;align-items:center"><img src="${escapeHtml(userLogoUrl)}" style="width:46px;height:46px;object-fit:contain;border-radius:12px;border:1px solid #dbe4f0;padding:5px"/><div><div class="logo-mark">${escapeHtml(clinicName)}</div><div class="logo-sub">Receituário de manipulação veterinária</div></div></div>` : `<div><div class="logo-mark">Dr<span>Vet</span></div><div class="logo-sub">${escapeHtml(clinicName)}</div></div>`;
+                                        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receita de Manipulação</title><style>${css}</style></head><body><div class="sheet"><div class="top-band"></div><div class="page"><div class="header">${logoHtml}<div class="clinic-info"><div class="clinic-name">${escapeHtml(clinicName)}</div>${meta?.clinicAddress ? `${escapeHtml(meta.clinicAddress)}<br/>` : ""}${meta?.clinicPhone ? `Tel: ${escapeHtml(meta.clinicPhone)}<br/>` : ""}${doctorName ? `Vet: ${escapeHtml(doctorName)}<br/>` : ""}${ (meta as Record<string,unknown>)?.vetCrmv ? `CRMV: ${escapeHtml(String((meta as Record<string,unknown>).vetCrmv))}` : ""}</div></div><div class="title-box"><div><div class="title">Receita de Manipulação Veterinária</div></div><div class="date-chip">Emissão: ${escapeHtml(formatDate(event.date))}</div></div><span class="badge-manipulacao">Fórmula magistral</span><div class="patient"><div><div class="field-label">Paciente</div><div class="field-value">${escapeHtml(pet.name)}</div></div><div><div class="field-label">Tutor</div><div class="field-value">${escapeHtml(client.name)}</div></div><div><div class="field-label">Espécie / Raça</div><div class="field-value">${escapeHtml(`${SP[pet.species]} / ${pet.breed || "Não informada"}`)}</div></div><div><div class="field-label">Peso</div><div class="field-value">${escapeHtml(pet.weight ? `${pet.weight} kg` : "Não informado")}</div></div></div><div class="section-title">Fórmulas prescritas</div><div class="items">${itemsHtml}</div>${event.notes ? `<div style="margin-top:12px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;padding:10px 12px;font-size:10px;line-height:1.6;white-space:pre-wrap;color:#334155"><strong>Observações gerais</strong><br/>${escapeHtml(event.notes)}</div>` : ""}<div class="footer"><div class="signature"><strong>${escapeHtml(doctorName)}</strong>${(meta as Record<string,unknown>)?.vetCrmv ? `CRMV: ${escapeHtml(String((meta as Record<string,unknown>).vetCrmv))}` : "CRMV: ____________________"}</div><div class="signature"><strong>Assinatura e carimbo</strong>&nbsp;</div></div><div class="footnote">Impresso em ${escapeHtml(new Date().toLocaleString("pt-BR"))} • DrVet</div></div></div></body></html>`;
+                                        win.document.write(html);
+                                        win.document.close();
+                                        win.print();
+                                      }}
+                                      title="Imprimir receita de manipulação"
                                     >
                                       <Printer className="w-4 h-4" />
                                     </Button>

@@ -194,6 +194,7 @@ export type MedicalEventType =
   | "vaccine"
   | "exam"
   | "prescription"
+  | "compound_prescription"
   | "observation"
   | "weight"
   | "surgery"
