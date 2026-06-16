@@ -389,7 +389,7 @@ export default function PublicBookingPage({
                           done
                             ? { background: accentColor }
                             : active
-                            ? { background: primaryColor, ringColor: `${primaryColor}26` }
+                            ? { background: primaryColor }
                             : undefined
                         }
                       >
