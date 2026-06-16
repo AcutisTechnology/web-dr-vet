@@ -35,4 +35,16 @@ export const appointmentService = {
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/appointments/${id}`);
   },
+
+  byMonth: async (year: number, month: number): Promise<{
+    total: number;
+    by_status: Record<string, number>;
+    by_service: Record<string, number>;
+    by_week: Record<string, number>;
+    completed_rate: number;
+    cancelled_rate: number;
+  }> => {
+    const { data } = await apiClient.get(`/appointments/month/${year}/${month}`);
+    return data;
+  },
 };

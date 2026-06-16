@@ -1,9 +1,10 @@
 import axios from "axios";
 import { useSessionStore } from "@/stores/session";
 
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api").replace(/\/+$/, "");
+
 export const apiClient = axios.create({
-  baseURL: "https://api.drvet.app.br/api",
-  // baseURL: "http://localhost:8000/api",
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",

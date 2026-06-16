@@ -60,3 +60,11 @@ export function useDeleteAppointment() {
     },
   });
 }
+
+export function useAppointmentStats(year: number, month: number) {
+  return useQuery({
+    queryKey: ["appointments", "stats", year, month],
+    queryFn: () => appointmentService.byMonth(year, month),
+    staleTime: 1000 * 60 * 5,
+  });
+}
