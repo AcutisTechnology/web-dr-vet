@@ -5,6 +5,7 @@ export function adaptApiPetToPet(p: ApiPet): Pet {
   return {
     id: p.id,
     clientId: p.client?.id ?? "",
+    clientName: p.client?.name ?? undefined,
     name: p.name,
     species: (p.species as PetSpecies) ?? "other",
     breed: p.breed ?? "",

@@ -162,6 +162,7 @@ export interface PetAnamnesis {
 export interface Pet {
   id: string;
   clientId: string;
+  clientName?: string;
   name: string;
   species: PetSpecies;
   breed: string;

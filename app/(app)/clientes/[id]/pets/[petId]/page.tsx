@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
   Save,
@@ -21,6 +21,11 @@ import {
   Upload,
   Mic,
   MicOff,
+  AlertTriangle,
+  CalendarDays,
+  Stethoscope,
+  Wallet,
+  HeartPulse,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -593,6 +598,7 @@ function BB({ l, v }: { l: string; v?: boolean }) {
 export default function PetDetailPage() {
   const { id: clientId, petId } = useParams<{ id: string; petId: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const { user: currentUser } = useSessionStore();
   const { getLogo } = useLogoStore();
@@ -655,10 +661,11 @@ export default function PetDetailPage() {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [activeTab, setActiveTab] = useState("dados");
+  const [activeTab, setActiveTab] = useState("resumo");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const autoVoiceStartedRef = useRef(false);
   const [isDictating, setIsDictating] = useState(false);
   const [isTranscribingAudio, setIsTranscribingAudio] = useState(false);
   const [attendanceSaving, setAttendanceSaving] = useState(false);
@@ -844,6 +851,49 @@ export default function PetDetailPage() {
       .filter((e) => e.fromSale)
       .reduce((s, e) => s + e.amount, 0),
   };
+  const pendingFinanceAmount = petFinanceEntries
+    .filter((entry) => entry.status === "pending" || entry.status === "overdue")
+    .reduce((sum, entry) => sum + entry.amount, 0);
+  const latestEvent = events[0];
+  const prescriptionCount = events.filter(
+    (event) => event.type === "prescription" || event.type === "compound_prescription",
+  ).length;
+  const pendingExams = examRecords.filter((exam) => exam.status !== "completed");
+  const nextVaccine = vaccineRecords
+    .filter((vaccine) => vaccine.next_date)
+    .sort((a, b) => new Date(a.next_date!).getTime() - new Date(b.next_date!).getTime())[0];
+  const overdueVaccines = vaccineRecords.filter(
+    (vaccine) => vaccine.next_date && new Date(vaccine.next_date) < new Date(),
+  );
+  const anamnesisEntries = Object.entries(an).filter(([, value]) => {
+    if (value === undefined || value === null || value === "") return false;
+    if (typeof value === "boolean") return value;
+    return true;
+  });
+  const anamnesisCompletion = Math.round(
+    (anamnesisEntries.length / Math.max(Object.keys(EMPTY_AN).length, 1)) * 100,
+  );
+  const clinicalAlerts = [
+    an.knownAllergies && `Alergias: ${an.knownAllergies}`,
+    an.chronicConditions && `Condição crônica: ${an.chronicConditions}`,
+    an.currentMedications && `Medicação contínua: ${an.currentMedications}`,
+    pet?.notes && `Observação: ${pet.notes}`,
+  ].filter(Boolean) as string[];
+  const dashboardPendencies = [
+    pendingExams.length > 0 && `${pendingExams.length} exame${pendingExams.length > 1 ? "s" : ""} pendente${pendingExams.length > 1 ? "s" : ""}`,
+    overdueVaccines.length > 0 && `${overdueVaccines.length} vacina${overdueVaccines.length > 1 ? "s" : ""} vencida${overdueVaccines.length > 1 ? "s" : ""}`,
+    pendingFinanceAmount > 0 && `${formatCurrency(pendingFinanceAmount)} em aberto`,
+    anamnesisCompletion < 50 && "Anamnese pouco preenchida",
+  ].filter(Boolean) as string[];
+  const ageLabel = pet?.birthDate
+    ? (() => {
+        const diff = Date.now() - new Date(pet.birthDate!).getTime();
+        const years = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
+        if (years >= 1) return `${years} ano${years > 1 ? "s" : ""}`;
+        const months = Math.max(1, Math.floor(diff / (30.44 * 24 * 60 * 60 * 1000)));
+        return `${months} mese${months > 1 ? "s" : ""}`;
+      })()
+    : "Idade não informada";
   const refreshFinance = () => {
     qc.invalidateQueries({ queryKey: ["finance-entries", "pet", petId] });
     qc.invalidateQueries({ queryKey: ["finance-entries"] });
@@ -1121,6 +1171,23 @@ export default function PetDetailPage() {
       });
     }
   };
+
+  useEffect(() => {
+    const targetTab = searchParams.get("tab");
+    if (targetTab) setActiveTab(targetTab);
+
+    if (
+      searchParams.get("record") === "1" &&
+      pet &&
+      !autoVoiceStartedRef.current
+    ) {
+      autoVoiceStartedRef.current = true;
+      setActiveTab("atendimento");
+      window.setTimeout(() => {
+        void toggleAttendanceDictation();
+      }, 350);
+    }
+  }, [pet, searchParams]);
 
   const handleSaveAttendance = async () => {
     if (!pet) return;
@@ -2120,6 +2187,30 @@ ${r("Observações clínicas", an.clinicalObservations)}
     });
   };
 
+  const renderAnamnesisNav = (current: string) => (
+    <div className="mb-4 rounded-2xl border bg-white p-2 shadow-sm">
+      <div className="flex flex-wrap gap-2">
+        {[
+          { value: "queixas", label: "Queixa e sinais" },
+          { value: "historico", label: "Histórico médico" },
+          { value: "ambiente", label: "Rotina" },
+          { value: "preventivos", label: "Preventivos" },
+          { value: "obs", label: "Comportamento" },
+        ].map((item) => (
+          <Button
+            key={item.value}
+            type="button"
+            size="sm"
+            variant={current === item.value ? "default" : "ghost"}
+            onClick={() => setActiveTab(item.value)}
+          >
+            {item.label}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+
   if (loading)
     return (
       <div className="flex items-center justify-center h-64">
@@ -2217,18 +2308,13 @@ ${r("Observações clínicas", an.clinicalObservations)}
 
       <VerticalTabs
         tabs={[
-          { value: "dados", label: "Identificação" },
-          { value: "queixas", label: "Queixa Atual" },
-          { value: "historico", label: "Histórico Médico" },
-          { value: "ambiente", label: "Rotina e Alimentação" },
-          { value: "preventivos", label: "Preventivos" },
-          { value: "obs", label: "Comportamento" },
-          { value: "vacinas", label: `Vacinas (${vaccineRecords.length})` },
-          { value: "exames", label: `Exames (${examRecords.length})` },
-          { value: "ia", label: "✨ Diagnóstico IA" },
-          { value: "receituario", label: "Receituário" },
+          { value: "resumo", label: "Resumo" },
           { value: "atendimento", label: "Atendimento" },
-          { value: "prontuario", label: `Prontuário (${events.length})` },
+          { value: "queixas", label: "Anamnese" },
+          { value: "ia", label: "Diagnóstico IA" },
+          { value: "prontuario", label: `Histórico (${events.length})` },
+          { value: "vacinas", label: "Exames e Vacinas" },
+          { value: "receituario", label: "Receitas" },
           { value: "financeiro", label: "Financeiro" },
         ]}
         value={activeTab}
@@ -2236,6 +2322,206 @@ ${r("Observações clínicas", an.clinicalObservations)}
       >
         {/* conteúdo das tabs — div wrapper para manter space-y-4 */}
         <div>
+          {/* RESUMO */}
+          <TabsContent value="resumo" className="space-y-4">
+            <Card className="overflow-hidden border-primary/15 bg-gradient-to-br from-primary/8 via-background to-accent/10">
+              <CardContent className="p-5 sm:p-6">
+                <div className="grid gap-5 lg:grid-cols-[1.4fr_0.9fr] lg:items-center">
+                  <div className="flex gap-4 min-w-0">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-white text-3xl shadow-sm ring-1 ring-border">
+                      {pet.photos?.[0]?.url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={pet.photos[0].url} alt={pet.name} className="h-full w-full rounded-3xl object-cover" />
+                      ) : (
+                        <HeartPulse className="h-9 w-9 text-primary" />
+                      )}
+                    </div>
+                    <div className="min-w-0 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-2xl font-bold tracking-tight [font-family:var(--font-heading)]">{pet.name}</h2>
+                        <Badge variant={pet.status === "active" ? "secondary" : "destructive"}>
+                          {pet.status === "active" ? "Ativo" : "Óbito"}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {SP[pet.species]} · {pet.breed || "Raça não informada"} · {pet.sex === "male" ? "Macho" : "Fêmea"} · {ageLabel}
+                        {pet.weight ? ` · ${pet.weight} kg` : ""}
+                      </p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {client?.name ?? "Tutor não informado"}{client?.phone ? ` · ${client.phone}` : ""}
+                      </p>
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        <Button size="sm" onClick={() => setActiveTab("atendimento")}>
+                          <Stethoscope className="mr-1.5 h-4 w-4" /> Atendimento
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setActiveTab("receituario")}>
+                          <FileText className="mr-1.5 h-4 w-4" /> Receita
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setActiveTab("exames")}>
+                          <FlaskConical className="mr-1.5 h-4 w-4" /> Exame
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setActiveTab("vacinas")}>
+                          <Syringe className="mr-1.5 h-4 w-4" /> Vacina
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setActiveTab("financeiro")}>
+                          <Wallet className="mr-1.5 h-4 w-4" /> Cobrança
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 rounded-3xl border bg-white/85 p-4 shadow-sm">
+                    <div className="flex items-center gap-2 text-sm font-semibold">
+                      <AlertTriangle className="h-4 w-4 text-[color:var(--warning)]" /> Alertas
+                    </div>
+                    {clinicalAlerts.length === 0 && dashboardPendencies.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Sem alertas.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {[...clinicalAlerts, ...dashboardPendencies].slice(0, 5).map((alert) => (
+                          <div key={alert} className="rounded-2xl bg-warning/10 px-3 py-2 text-sm text-[color:var(--warning)]">
+                            {alert}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {[
+                {
+                  title: "Último atendimento",
+                  value: latestEvent ? formatDate(latestEvent.date) : "Sem registros",
+                  detail: latestEvent ? (latestEvent.title || EVT_LBL[latestEvent.type] || latestEvent.type) : "Novo atendimento",
+                  icon: Stethoscope,
+                  tab: "prontuario",
+                },
+                {
+                  title: "Próxima vacina",
+                  value: nextVaccine?.next_date ? formatDate(nextVaccine.next_date) : "Não informada",
+                  detail: nextVaccine?.name ?? `${vaccineRecords.length} registro${vaccineRecords.length === 1 ? "" : "s"}`,
+                  icon: Syringe,
+                  tab: "vacinas",
+                },
+                {
+                  title: "Exames",
+                  value: `${pendingExams.length} pendente${pendingExams.length === 1 ? "" : "s"}`,
+                  detail: `${examRecords.length} registro${examRecords.length === 1 ? "" : "s"}`,
+                  icon: FlaskConical,
+                  tab: "exames",
+                },
+                {
+                  title: "Financeiro",
+                  value: pendingFinanceAmount > 0 ? formatCurrency(pendingFinanceAmount) : "Sem pendências",
+                  detail: pendingFinanceAmount > 0 ? "em aberto" : "em dia",
+                  icon: Wallet,
+                  tab: "financeiro",
+                },
+                {
+                  title: "Receitas",
+                  value: `${prescriptionCount} emitida${prescriptionCount === 1 ? "" : "s"}`,
+                  detail: "prescrições",
+                  icon: FileText,
+                  tab: "receituario",
+                },
+                {
+                  title: "Histórico",
+                  value: `${events.length} registro${events.length === 1 ? "" : "s"}`,
+                  detail: "timeline",
+                  icon: BookOpen,
+                  tab: "prontuario",
+                },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.title}
+                    type="button"
+                    onClick={() => setActiveTab(item.tab)}
+                    className="rounded-3xl border bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{item.title}</p>
+                        <p className="mt-2 text-xl font-bold text-foreground">{item.value}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>
+                      </div>
+                      <div className="rounded-2xl bg-primary/10 p-2 text-primary">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-3">
+                  <CardTitle className="text-base">Atividade recente</CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setActiveTab("prontuario")}>Ver histórico</Button>
+                </CardHeader>
+                <CardContent>
+                  {events.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+                      Nenhum evento clínico registrado ainda.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {events.slice(0, 5).map((event) => (
+                        <div key={event.id} className="flex gap-3 rounded-2xl border bg-muted/20 p-3">
+                          <div className={`mt-1 h-2.5 w-2.5 rounded-full ${(EVT_CLR[event.type] ?? "bg-muted text-muted-foreground").split(" ")[0]}`} />
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold truncate">{event.title || EVT_LBL[event.type] || event.type}</p>
+                            <p className="text-xs text-muted-foreground">{formatDate(event.date)}{event.vet?.name ? ` · Dr(a). ${event.vet.name}` : ""}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-3">
+                  <CardTitle className="text-base">Anamnese</CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setActiveTab("queixas")}>Editar</Button>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <div className="mb-2 flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Preenchimento</span>
+                      <span className="font-semibold">{anamnesisCompletion}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted">
+                      <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.min(anamnesisCompletion, 100)}%` }} />
+                    </div>
+                  </div>
+                  {anamnesisEntries.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nenhuma informação de anamnese preenchida.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {[
+                        an.vomiting && `Vômito: ${an.vomiting}`,
+                        an.diarrhea && `Diarreia: ${an.diarrhea}`,
+                        an.eating && `Apetite: ${an.eating}`,
+                        an.knownAllergies && `Alergias: ${an.knownAllergies}`,
+                        an.chronicConditions && `Condições crônicas: ${an.chronicConditions}`,
+                      ].filter(Boolean).slice(0, 5).map((item) => (
+                        <div key={String(item)} className="rounded-2xl bg-muted/50 px-3 py-2 text-sm">
+                          {item}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
           {/* DADOS BÁSICOS */}
           <TabsContent value="dados">
             <Card>
@@ -2375,6 +2661,7 @@ ${r("Observações clínicas", an.clinicalObservations)}
 
           {/* QUEIXA ATUAL */}
           <TabsContent value="queixas">
+            {renderAnamnesisNav("queixas")}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">
@@ -2652,6 +2939,7 @@ ${r("Observações clínicas", an.clinicalObservations)}
 
           {/* AMBIENTE E ALIMENTAÇÃO */}
           <TabsContent value="ambiente">
+            {renderAnamnesisNav("ambiente")}
             <div className="space-y-4">
               <Card>
                 <CardHeader>
@@ -2848,6 +3136,7 @@ ${r("Observações clínicas", an.clinicalObservations)}
 
           {/* PREVENTIVOS */}
           <TabsContent value="preventivos">
+            {renderAnamnesisNav("preventivos")}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">
@@ -2925,6 +3214,7 @@ ${r("Observações clínicas", an.clinicalObservations)}
           </TabsContent>
           {/* HISTÓRICO MÉDICO */}
           <TabsContent value="historico">
+            {renderAnamnesisNav("historico")}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Histórico Médico</CardTitle>
@@ -3702,6 +3992,7 @@ ${r("Observações clínicas", an.clinicalObservations)}
 
           {/* COMPORTAMENTO E OBSERVAÇÕES */}
           <TabsContent value="obs">
+            {renderAnamnesisNav("obs")}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">
@@ -3772,6 +4063,10 @@ ${r("Observações clínicas", an.clinicalObservations)}
           {/* VACINAS */}
           <TabsContent value="vacinas">
             <div className="space-y-4">
+              <div className="flex w-full flex-wrap gap-2 rounded-2xl border bg-white p-2 shadow-sm sm:w-fit">
+                <Button size="sm" onClick={() => setActiveTab("vacinas")}>Vacinas ({vaccineRecords.length})</Button>
+                <Button size="sm" variant="ghost" onClick={() => setActiveTab("exames")}>Exames ({examRecords.length})</Button>
+              </div>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <p className="font-medium text-sm">
                   Vacinação de <span className="text-primary font-semibold">{pet.name}</span>
@@ -4018,6 +4313,10 @@ ${r("Observações clínicas", an.clinicalObservations)}
           {/* EXAMES */}
           <TabsContent value="exames">
             <div className="space-y-4">
+              <div className="flex w-full flex-wrap gap-2 rounded-2xl border bg-white p-2 shadow-sm sm:w-fit">
+                <Button size="sm" variant="ghost" onClick={() => setActiveTab("vacinas")}>Vacinas ({vaccineRecords.length})</Button>
+                <Button size="sm" onClick={() => setActiveTab("exames")}>Exames ({examRecords.length})</Button>
+              </div>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <p className="font-medium text-sm">
                   Exames clínicos de <span className="text-primary font-semibold">{pet.name}</span>

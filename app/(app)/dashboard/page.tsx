@@ -1,4 +1,6 @@
 "use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Calendar,
   ShoppingCart,
@@ -7,12 +9,18 @@ import {
   Clock,
   RefreshCw,
   Syringe,
+  Mic,
+  PawPrint,
+  Search,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
 import { useDashboardStats } from "@/hooks/use-dashboard";
+import { usePets } from "@/hooks/use-clients-pets";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -91,7 +99,27 @@ function KpiCard({
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { data: stats, isLoading, refetch } = useDashboardStats();
+  const { data: pets = [] } = usePets();
+  const [voiceDialogOpen, setVoiceDialogOpen] = useState(false);
+  const [petSearch, setPetSearch] = useState("");
+
+  const filteredPets = pets
+    .filter((pet) => pet.status === "active")
+    .filter((pet) => {
+      const term = petSearch.toLowerCase().trim();
+      if (!term) return true;
+      return [pet.name, pet.breed, pet.clientName].some((value) =>
+        String(value ?? "").toLowerCase().includes(term),
+      );
+    })
+    .slice(0, 8);
+
+  const startVoiceAttendance = (pet: (typeof pets)[number]) => {
+    if (!pet.clientId) return;
+    router.push(`/clientes/${pet.clientId}/pets/${pet.id}?tab=atendimento&record=1`);
+  };
 
   const weeklySalesChart = (stats?.weekly_sales ?? []).map((d) => ({
     day: format(parseISO(d.date), "EEE", { locale: ptBR }),
@@ -119,20 +147,42 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 font-sans">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold [font-family:var(--font-heading)]">Dashboard</h1>
           <p className="text-muted-foreground text-sm">Visão geral do dia</p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => refetch()}
-          title="Atualizar"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setVoiceDialogOpen(true)} className="rounded-2xl">
+            <Mic className="w-4 h-4 mr-1.5" /> Gravar atendimento
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => refetch()}
+            title="Atualizar"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
+
+      <Card className="border-primary/20 bg-gradient-to-br from-primary/8 via-background to-accent/10">
+        <CardContent className="p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
+              <Mic className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-semibold">Atendimento por voz</p>
+              <p className="text-sm text-muted-foreground">Escolha o pet e comece a gravar direto no prontuário.</p>
+            </div>
+          </div>
+          <Button onClick={() => setVoiceDialogOpen(true)}>
+            Iniciar agora
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -393,6 +443,58 @@ export default function DashboardPage() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      <Dialog open={voiceDialogOpen} onOpenChange={setVoiceDialogOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Gravar atendimento por voz</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={petSearch}
+                onChange={(event) => setPetSearch(event.target.value)}
+                placeholder="Buscar pet por nome ou raça..."
+                className="pl-9"
+                autoFocus
+              />
+            </div>
+            <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+              {filteredPets.length === 0 ? (
+                <div className="rounded-2xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+                  Nenhum pet encontrado.
+                </div>
+              ) : (
+                filteredPets.map((pet) => (
+                  <button
+                    key={pet.id}
+                    type="button"
+                    onClick={() => startVoiceAttendance(pet)}
+                    disabled={!pet.clientId}
+                    className="flex w-full items-center justify-between gap-3 rounded-2xl border bg-white p-3 text-left transition hover:border-primary/40 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-muted text-primary">
+                        <PawPrint className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold truncate">{pet.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {pet.clientName ? `${pet.clientName} · ` : ""}{pet.breed || "Raça não informada"}{pet.weight ? ` · ${pet.weight} kg` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                      <Mic className="h-4 w-4" /> Gravar
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
