@@ -1,7 +1,8 @@
 "use client";
 import { useState, useMemo } from "react";
-import { Plus, Search, Eye, Edit, Trash2, PawPrint } from "lucide-react";
+import { Plus, Search, Eye, Edit, Trash2, PawPrint, Copy, CalendarCheck2, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -24,10 +25,23 @@ import {
 } from "@/hooks/use-clients-pets";
 import type { Client } from "@/types";
 import { formatDate } from "@/lib/utils";
+import { apiClient } from "@/lib/api-client";
+
+interface BookingConfig {
+  public_token: string | null;
+  booking_enabled: boolean;
+}
 
 export default function ClientesPage() {
   const { toast } = useToast();
   const { data: clients = [], isLoading } = useClients();
+  const { data: bookingConfig } = useQuery({
+    queryKey: ["clinics", "booking-config"],
+    queryFn: async () => {
+      const { data } = await apiClient.get<BookingConfig>("/clinics/booking-config");
+      return data;
+    },
+  });
   const createClient = useCreateClient();
   const updateClient = useUpdateClient();
   const deleteClient = useDeleteClient();
@@ -155,9 +169,18 @@ export default function ClientesPage() {
   };
 
   const isSaving = createClient.isPending || updateClient.isPending;
+  const bookingUrl = bookingConfig?.public_token
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/agendar/${bookingConfig.public_token}`
+    : "";
+
+  const copyBookingUrl = async () => {
+    if (!bookingUrl) return;
+    await navigator.clipboard.writeText(bookingUrl);
+    toast({ title: "Link público copiado" });
+  };
 
   return (
-    <div className="space-y-4 font-sans">
+    <div className="space-y-5 font-sans">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-primary [font-family:var(--font-heading)]">Clientes & Pets</h1>
@@ -169,6 +192,59 @@ export default function ClientesPage() {
           <Plus className="w-4 h-4 mr-1" /> Novo Cliente
         </Button>
       </div>
+
+      <Card className="overflow-hidden border-primary/15 bg-gradient-to-br from-primary/8 via-background to-accent/10">
+        <CardContent className="p-5 sm:p-6">
+          <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+            <div className="space-y-3">
+              <Badge className="w-fit bg-primary/10 text-primary hover:bg-primary/10">
+                <CalendarCheck2 className="mr-1 h-3.5 w-3.5" /> Portal público do tutor
+              </Badge>
+              <div>
+                <h2 className="text-xl font-bold tracking-tight [font-family:var(--font-heading)]">
+                  Envie um link, o tutor escolhe o pet e agenda sozinho.
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                  O cliente informa o WhatsApp, visualiza os pets já cadastrados e seleciona consulta, exame, vacina ou outro serviço disponível.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs font-medium text-muted-foreground">
+                <span className="rounded-full bg-background/80 px-3 py-1">1. Identifica o tutor</span>
+                <span className="rounded-full bg-background/80 px-3 py-1">2. Seleciona o pet</span>
+                <span className="rounded-full bg-background/80 px-3 py-1">3. Escolhe data e horário</span>
+              </div>
+            </div>
+            <div className="rounded-2xl border bg-background/85 p-3 shadow-sm">
+              {bookingUrl ? (
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Link para compartilhar</p>
+                  <div className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground break-all">
+                    {bookingUrl}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" size="sm" onClick={copyBookingUrl}>
+                      <Copy className="mr-1.5 h-4 w-4" /> Copiar
+                    </Button>
+                    <Button size="sm" asChild>
+                      <Link href={bookingUrl} target="_blank">
+                        <ExternalLink className="mr-1.5 h-4 w-4" /> Abrir
+                      </Link>
+                    </Button>
+                  </div>
+                  {!bookingConfig?.booking_enabled && (
+                    <p className="text-xs text-[color:var(--warning)]">Agendamento público está desativado nas configurações da clínica.</p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <p className="font-medium text-foreground">Link público ainda indisponível.</p>
+                  <p>Ative o agendamento online nas configurações da clínica para gerar o token público.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

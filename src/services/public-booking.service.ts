@@ -32,11 +32,24 @@ export interface BookingPayload {
   client_name: string;
   client_phone: string;
   client_email?: string;
+  pet_id?: string;
   pet_name: string;
   pet_species: string;
   service_type: string;
   date: string;
   start_time: string;
+}
+
+export interface BookingLookupPet {
+  id: string;
+  name: string;
+  species: string;
+  breed: string | null;
+}
+
+export interface BookingLookupResult {
+  client: { id: string; name: string; phone: string; email: string | null } | null;
+  pets: BookingLookupPet[];
 }
 
 export const publicBookingService = {
@@ -48,6 +61,14 @@ export const publicBookingService = {
   getSlots: async (token: string, date: string): Promise<BookingSlot[]> => {
     const { data } = await publicClient.get(`/public/booking/${token}/slots/${date}`);
     return data.slots;
+  },
+
+  lookupClient: async (
+    token: string,
+    payload: { client_phone: string; client_email?: string },
+  ): Promise<BookingLookupResult> => {
+    const { data } = await publicClient.post(`/public/booking/${token}/lookup-client`, payload);
+    return data;
   },
 
   book: async (token: string, payload: BookingPayload) => {

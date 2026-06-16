@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
 import { useParams, useRouter } from "next/navigation";
 import {
   ChevronLeft,
@@ -17,6 +19,8 @@ import {
   FileText,
   ExternalLink,
   Upload,
+  Mic,
+  MicOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +70,12 @@ import { formatDate, formatCurrency, exportToCSV } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 
+const CKEditor = dynamic(
+  () => import("@ckeditor/ckeditor5-react").then((mod) => mod.CKEditor),
+  { ssr: false },
+);
+const ClassicEditorBuild = ClassicEditor as unknown as React.ComponentProps<typeof CKEditor>["editor"];
+
 interface PrescriptionDraftItem {
   medication: string;
   dosage: string;
@@ -101,6 +111,56 @@ function escapeHtml(value: string | null | undefined) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+async function convertBlobToWav(blob: Blob): Promise<Blob> {
+  const AudioContextCtor = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextCtor) return blob;
+
+  const audioContext = new AudioContextCtor();
+  const arrayBuffer = await blob.arrayBuffer();
+  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+  await audioContext.close();
+
+  const channels = Math.min(audioBuffer.numberOfChannels, 2);
+  const sampleRate = audioBuffer.sampleRate;
+  const samples = audioBuffer.length;
+  const bytesPerSample = 2;
+  const blockAlign = channels * bytesPerSample;
+  const buffer = new ArrayBuffer(44 + samples * blockAlign);
+  const view = new DataView(buffer);
+
+  const writeString = (offset: number, value: string) => {
+    for (let i = 0; i < value.length; i += 1) {
+      view.setUint8(offset + i, value.charCodeAt(i));
+    }
+  };
+
+  writeString(0, "RIFF");
+  view.setUint32(4, 36 + samples * blockAlign, true);
+  writeString(8, "WAVE");
+  writeString(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, channels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * blockAlign, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true);
+  writeString(36, "data");
+  view.setUint32(40, samples * blockAlign, true);
+
+  const channelData = Array.from({ length: channels }, (_, index) => audioBuffer.getChannelData(index));
+  let offset = 44;
+  for (let i = 0; i < samples; i += 1) {
+    for (let channel = 0; channel < channels; channel += 1) {
+      const sample = Math.max(-1, Math.min(1, channelData[channel][i]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      offset += 2;
+    }
+  }
+
+  return new Blob([buffer], { type: "audio/wav" });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -596,6 +656,26 @@ export default function PetDetailPage() {
   const [dirty, setDirty] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState("dados");
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const [isDictating, setIsDictating] = useState(false);
+  const [isTranscribingAudio, setIsTranscribingAudio] = useState(false);
+  const [attendanceSaving, setAttendanceSaving] = useState(false);
+  const [attendanceForm, setAttendanceForm] = useState({
+    date: new Date().toISOString().split("T")[0],
+    serviceType: "consultation",
+    title: "",
+    document: "",
+    details: {
+      physicalExam: false,
+      medicationApplied: false,
+      vaccineApplied: false,
+      examRequested: false,
+      tutorOriented: false,
+      returnNeeded: false,
+    },
+  });
   const [form, setForm] = useState({
     name: "",
     species: "dog" as Pet["species"],
@@ -730,6 +810,13 @@ export default function PetDetailPage() {
         : current.clinicName,
     }));
   }, [currentUser?.name, currentUser?.clinicName]);
+
+  useEffect(() => {
+    return () => {
+      mediaRecorderRef.current?.stop();
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
 
   const PET_FINANCE_INCOME_TYPES = [
     "consultation",
@@ -941,6 +1028,144 @@ export default function PetDetailPage() {
   ) => {
     setAn((a) => ({ ...a, [field]: value }));
     setDirty(true);
+  };
+
+  const setAttendanceField = (
+    field: "date" | "serviceType" | "title" | "document",
+    value: string,
+  ) => {
+    setAttendanceForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const setAttendanceDetail = (
+    field: keyof typeof attendanceForm.details,
+    value: boolean,
+  ) => {
+    setAttendanceForm((current) => ({
+      ...current,
+      details: { ...current.details, [field]: value },
+    }));
+  };
+
+  const resetAttendanceForm = () => {
+    setAttendanceForm({
+      date: new Date().toISOString().split("T")[0],
+      serviceType: "consultation",
+      title: "",
+      document: "",
+      details: {
+        physicalExam: false,
+        medicationApplied: false,
+        vaccineApplied: false,
+        examRequested: false,
+        tutorOriented: false,
+        returnNeeded: false,
+      },
+    });
+  };
+
+  const toggleAttendanceDictation = async () => {
+    if (isDictating) {
+      mediaRecorderRef.current?.stop();
+      setIsDictating(false);
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      toast({
+        title: "Gravação de áudio indisponível neste navegador",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      mediaStreamRef.current = stream;
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      recorder.onstop = async () => {
+        setIsDictating(false);
+        stream.getTracks().forEach((track) => track.stop());
+        const recordedAudio = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        if (!pet || recordedAudio.size === 0) return;
+
+        setIsTranscribingAudio(true);
+        try {
+          const audio = await convertBlobToWav(recordedAudio);
+          const result = await petService.transcribeAttendanceAudio(pet.id, audio);
+          setAttendanceForm((current) => ({
+            ...current,
+            document: `${current.document}${current.document ? "<p>&nbsp;</p>" : ""}${result.html || `<p>${escapeHtml(result.text)}</p>`}`,
+          }));
+          toast({ title: "Áudio transcrito com IA" });
+        } catch {
+          toast({ title: "Erro ao transcrever áudio com IA", variant: "destructive" });
+        } finally {
+          setIsTranscribingAudio(false);
+        }
+      };
+
+      recorder.start();
+      setIsDictating(true);
+    } catch {
+      toast({
+        title: "Permita o acesso ao microfone para gravar o atendimento",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveAttendance = async () => {
+    if (!pet) return;
+    const plainDocument = attendanceForm.document.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+    const htmlDocument = attendanceForm.document;
+
+    if (!plainDocument) {
+      toast({
+        title: "Escreva o registro do atendimento",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setAttendanceSaving(true);
+    try {
+      const detailLabels: Record<keyof typeof attendanceForm.details, string> = {
+        physicalExam: "Exame físico realizado",
+        medicationApplied: "Medicação aplicada",
+        vaccineApplied: "Vacina aplicada",
+        examRequested: "Exame solicitado",
+        tutorOriented: "Tutor orientado",
+        returnNeeded: "Retorno necessário",
+      };
+      const checkedDetails = Object.entries(attendanceForm.details)
+        .filter(([, checked]) => checked)
+        .map(([key]) => detailLabels[key as keyof typeof attendanceForm.details]);
+
+      await medicalEventService.create({
+        pet_id: pet.id,
+        type: attendanceForm.serviceType,
+        date: attendanceForm.date,
+        title: attendanceForm.title.trim() || `Atendimento – ${formatDate(attendanceForm.date)}`,
+        description: htmlDocument,
+        notes: checkedDetails.length ? `Detalhes: ${checkedDetails.join("; ")}` : undefined,
+      });
+      await qc.invalidateQueries({ queryKey: ["medical-events", petId] });
+      toast({ title: "Atendimento registrado no prontuário" });
+      resetAttendanceForm();
+      setActiveTab("prontuario");
+    } catch {
+      toast({ title: "Erro ao registrar atendimento", variant: "destructive" });
+    } finally {
+      setAttendanceSaving(false);
+    }
   };
 
   const updatePetMutation = useMutation({
@@ -2002,6 +2227,7 @@ ${r("Observações clínicas", an.clinicalObservations)}
           { value: "exames", label: `Exames (${examRecords.length})` },
           { value: "ia", label: "✨ Diagnóstico IA" },
           { value: "receituario", label: "Receituário" },
+          { value: "atendimento", label: "Atendimento" },
           { value: "prontuario", label: `Prontuário (${events.length})` },
           { value: "financeiro", label: "Financeiro" },
         ]}
@@ -4100,6 +4326,159 @@ ${r("Observações clínicas", an.clinicalObservations)}
             </Drawer>
           </TabsContent>
 
+          {/* ATENDIMENTO */}
+          <TabsContent value="atendimento" className="space-y-4">
+            <Card className="overflow-hidden border-primary/15">
+              <CardHeader className="bg-white border-b">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle className="text-base">Registrar atendimento</CardTitle>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Descreva o que foi realizado em {pet.name}. O registro será salvo no prontuário clínico.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant={isDictating ? "destructive" : "outline"}
+                    size="lg"
+                    onClick={toggleAttendanceDictation}
+                    disabled={isTranscribingAudio}
+                    className={`shrink-0 rounded-2xl px-5 shadow-sm ${!isDictating ? "border-primary/30 bg-primary text-primary-foreground hover:bg-primary/90" : ""}`}
+                  >
+                    {isDictating ? (
+                      <MicOff className="mr-1.5 h-4 w-4" />
+                    ) : (
+                      <Mic className="mr-1.5 h-4 w-4" />
+                    )}
+                    {isTranscribingAudio
+                      ? "Transcrevendo com IA..."
+                      : isDictating
+                        ? "Parar e transcrever"
+                        : "Gravar atendimento com IA"}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-5 p-4 sm:p-5">
+                {isDictating && (
+                  <div className="rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                    Gravando áudio. Ao parar, o Gemini vai transcrever e organizar o texto no documento abaixo.
+                  </div>
+                )}
+                {isTranscribingAudio && (
+                  <div className="rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
+                    IA transcrevendo o áudio do atendimento. Aguarde alguns segundos antes de salvar.
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div className="space-y-1.5">
+                    <Label>Data</Label>
+                    <Input
+                      type="date"
+                      value={attendanceForm.date}
+                      onChange={(e) => setAttendanceField("date", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Tipo</Label>
+                    <Select
+                      value={attendanceForm.serviceType}
+                      onValueChange={(value) => setAttendanceField("serviceType", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="consultation">Consulta</SelectItem>
+                        <SelectItem value="return">Retorno</SelectItem>
+                        <SelectItem value="vaccine">Vacina</SelectItem>
+                        <SelectItem value="exam">Exame</SelectItem>
+                        <SelectItem value="surgery">Cirurgia</SelectItem>
+                        <SelectItem value="observation">Observação</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Título</Label>
+                    <Input
+                      value={attendanceForm.title}
+                      onChange={(e) => setAttendanceField("title", e.target.value)}
+                      placeholder="Ex.: Consulta dermatológica"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Documento do atendimento</Label>
+                  <div className="overflow-hidden rounded-2xl border bg-white shadow-sm [&_.ck-editor__editable]:min-h-80 [&_.ck-editor__editable]:px-6 [&_.ck-editor__editable]:py-5 [&_.ck-editor__editable]:text-sm [&_.ck-editor__editable]:leading-7">
+                    <CKEditor
+                      editor={ClassicEditorBuild}
+                      data={attendanceForm.document}
+                      config={{
+                        placeholder: "Digite como em um documento: queixa, exame físico, achados, procedimentos, diagnóstico, tratamento, medicações, exames solicitados e orientações ao tutor...",
+                        toolbar: [
+                          "heading",
+                          "|",
+                          "bold",
+                          "italic",
+                          "underline",
+                          "|",
+                          "bulletedList",
+                          "numberedList",
+                          "blockQuote",
+                          "|",
+                          "undo",
+                          "redo",
+                        ],
+                      }}
+                      onChange={(_, editor) => {
+                        const typedEditor = editor as { getData: () => string };
+                        setAttendanceField("document", typedEditor.getData());
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Use a barra do CKEditor para formatar. A gravação com IA adiciona a transcrição ao final do documento.
+                  </p>
+                </div>
+
+                <div className="space-y-2 rounded-2xl border bg-muted/20 p-4">
+                  <Label>Detalhes adicionais</Label>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {([
+                      ["physicalExam", "Exame físico realizado"],
+                      ["medicationApplied", "Medicação aplicada"],
+                      ["vaccineApplied", "Vacina aplicada"],
+                      ["examRequested", "Exame solicitado"],
+                      ["tutorOriented", "Tutor orientado"],
+                      ["returnNeeded", "Retorno necessário"],
+                    ] as const).map(([key, label]) => (
+                      <label key={key} className="flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-sm font-medium">
+                        <input
+                          type="checkbox"
+                          checked={attendanceForm.details[key]}
+                          onChange={(e) => setAttendanceDetail(key, e.target.checked)}
+                          className="h-4 w-4 accent-primary"
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
+                  <Button type="button" variant="outline" onClick={resetAttendanceForm}>
+                    Limpar
+                  </Button>
+                  <Button type="button" onClick={handleSaveAttendance} disabled={attendanceSaving}>
+                    <Save className="mr-1.5 h-4 w-4" />
+                    {attendanceSaving ? "Salvando..." : "Salvar atendimento"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* PRONTUÁRIO */}
           <TabsContent value="prontuario">
             <div className="space-y-4">
@@ -4338,7 +4717,10 @@ ${r("Observações clínicas", an.clinicalObservations)}
                                           );
                                         })()}
                                         {event.description && (
-                                          <p className="text-sm mt-2 text-gray-700">{event.description}</p>
+                                          <div
+                                            className="mt-2 rounded-xl border bg-white px-4 py-3 text-sm leading-7 text-gray-700 [&_h3]:mb-2 [&_h3]:text-base [&_h3]:font-bold [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5"
+                                            dangerouslySetInnerHTML={{ __html: event.description }}
+                                          />
                                         )}
                                         {event.diagnosis && (
                                           <p className="text-sm mt-1">

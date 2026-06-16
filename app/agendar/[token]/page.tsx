@@ -3,6 +3,7 @@ import { useState, useEffect, use, useMemo } from "react";
 import {
   publicBookingService,
   type BookingClinicInfo,
+  type BookingLookupPet,
   type BookingSlot,
 } from "@/services/public-booking.service";
 import {
@@ -212,9 +213,13 @@ export default function PublicBookingPage({
     client_name:  "",
     client_phone: "",
     client_email: "",
+    pet_id:       "",
     pet_name:     "",
     pet_species:  "dog",
   });
+
+  const [knownPets, setKnownPets] = useState<BookingLookupPet[]>([]);
+  const [lookupLoading, setLookupLoading] = useState(false);
 
   const [submitting,   setSubmitting]   = useState(false);
   const [confirmation, setConfirmation] = useState<{
@@ -229,6 +234,34 @@ export default function PublicBookingPage({
       .catch(() => setError("Este link de agendamento não está disponível."))
       .finally(() => setLoading(false));
   }, [token]);
+
+  useEffect(() => {
+    const digits = form.client_phone.replace(/\D/g, "");
+    if (digits.length < 10) {
+      setKnownPets([]);
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      setLookupLoading(true);
+      try {
+        const data = await publicBookingService.lookupClient(token, {
+          client_phone: form.client_phone,
+          client_email: form.client_email || undefined,
+        });
+        setKnownPets(data.pets);
+        if (data.client?.name && !form.client_name) {
+          setForm((current) => ({ ...current, client_name: data.client?.name ?? current.client_name }));
+        }
+      } catch {
+        setKnownPets([]);
+      } finally {
+        setLookupLoading(false);
+      }
+    }, 450);
+
+    return () => window.clearTimeout(timer);
+  }, [form.client_email, form.client_name, form.client_phone, token]);
 
   const loadSlots = async (date: string) => {
     setSlotsLoading(true);
@@ -255,6 +288,7 @@ export default function PublicBookingPage({
     try {
       const result = await publicBookingService.book(token, {
         ...form,
+        pet_id: form.pet_id || undefined,
         service_type: selectedService,
         date: selectedDate,
         start_time: selectedSlot.start,
@@ -620,7 +654,7 @@ export default function PublicBookingPage({
           </div>
         )}
 
-        {/* ─── STEP 4: Dados do cliente ─────────────────────────────────── */}
+        {/* ─── STEP 4: Tutor e pet ──────────────────────────────────────── */}
         {step === 4 && (
           <div className="space-y-3">
             {/* Summary pill */}
@@ -648,8 +682,8 @@ export default function PublicBookingPage({
             {/* Client data */}
             <div className="bg-white rounded-2xl border border-[#dde3ee] shadow-sm overflow-hidden">
               <div className="px-6 pt-6 pb-4 border-b border-[#eef2f7]">
-                <h2 className="text-base font-bold text-[#172033]">Seus dados</h2>
-                <p className="text-xs text-[#5e6b85] mt-0.5">Para confirmar sua reserva</p>
+                <h2 className="text-base font-bold text-[#172033]">Identifique o tutor</h2>
+                <p className="text-xs text-[#5e6b85] mt-0.5">Use o mesmo WhatsApp cadastrado na clínica para localizar seus pets</p>
               </div>
               <div className="p-5 space-y-3.5">
                 <div className="space-y-1.5">
@@ -668,7 +702,7 @@ export default function PublicBookingPage({
                     type="tel"
                     placeholder="(00) 00000-0000"
                     value={form.client_phone}
-                    onChange={(e) => setForm((f) => ({ ...f, client_phone: maskPhone(e.target.value) }))}
+                    onChange={(e) => setForm((f) => ({ ...f, client_phone: maskPhone(e.target.value), pet_id: "" }))}
                     maxLength={16}
                     className="w-full border border-[#dde3ee] rounded-xl px-4 py-3 text-sm text-[#172033] placeholder:text-[#c5ccda] focus:outline-none focus:border-[#1b2a6b] focus:ring-2 focus:ring-[#1b2a6b]/10 transition-all"
                   />
@@ -679,7 +713,7 @@ export default function PublicBookingPage({
                     type="email"
                     placeholder="seu@email.com"
                     value={form.client_email}
-                    onChange={(e) => setForm((f) => ({ ...f, client_email: e.target.value }))}
+                    onChange={(e) => setForm((f) => ({ ...f, client_email: e.target.value, pet_id: "" }))}
                     className="w-full border border-[#dde3ee] rounded-xl px-4 py-3 text-sm text-[#172033] placeholder:text-[#c5ccda] focus:outline-none focus:border-[#1b2a6b] focus:ring-2 focus:ring-[#1b2a6b]/10 transition-all"
                   />
                 </div>
@@ -690,16 +724,64 @@ export default function PublicBookingPage({
             <div className="bg-white rounded-2xl border border-[#dde3ee] shadow-sm overflow-hidden">
               <div className="px-6 pt-5 pb-4 border-b border-[#eef2f7] flex items-center gap-2">
                 <PawPrint className="w-4 h-4 text-[#2dc6c6]" />
-                <h2 className="text-base font-bold text-[#172033]">Dados do pet</h2>
+                <h2 className="text-base font-bold text-[#172033]">Selecione o pet</h2>
               </div>
               <div className="p-5 space-y-3.5">
+                {lookupLoading && (
+                  <div className="flex items-center gap-2 rounded-xl bg-[#eef1fa] px-4 py-3 text-xs font-semibold text-[#5e6b85]">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Buscando pets cadastrados...
+                  </div>
+                )}
+
+                {knownPets.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-[#5e6b85] uppercase tracking-wide">Pets encontrados</label>
+                    <div className="flex gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+                      {knownPets.map((pet) => {
+                        const active = form.pet_id === pet.id;
+                        const sp = species.find((item) => item.value === pet.species) ?? species[5];
+                        return (
+                          <button
+                            key={pet.id}
+                            type="button"
+                            onClick={() => setForm((f) => ({
+                              ...f,
+                              pet_id: pet.id,
+                              pet_name: pet.name,
+                              pet_species: pet.species,
+                            }))}
+                            className={[
+                              "min-w-36 rounded-2xl border-2 px-4 py-3 text-left transition-all",
+                              active ? "shadow-md" : "border-[#eef2f7] hover:border-[#c5ccda]",
+                            ].join(" ")}
+                            style={active ? { borderColor: primaryColor, background: primaryColor } : undefined}
+                          >
+                            <span className="text-2xl leading-none">{sp.emoji}</span>
+                            <span className={`mt-2 block text-sm font-bold ${active ? "text-white" : "text-[#172033]"}`}>{pet.name}</span>
+                            <span className={`block text-[11px] ${active ? "text-white/75" : "text-[#5e6b85]"}`}>{pet.breed || sp.label}</span>
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, pet_id: "", pet_name: "", pet_species: "dog" }))}
+                        className="min-w-36 rounded-2xl border-2 border-dashed border-[#c5ccda] px-4 py-3 text-left text-[#5e6b85] transition-all hover:bg-[#f7fafc]"
+                      >
+                        <span className="text-2xl leading-none">+</span>
+                        <span className="mt-2 block text-sm font-bold text-[#172033]">Outro pet</span>
+                        <span className="block text-[11px]">Cadastrar agora</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-[#5e6b85] uppercase tracking-wide">Nome do pet *</label>
                   <input
                     type="text"
                     placeholder="Como seu pet se chama?"
                     value={form.pet_name}
-                    onChange={(e) => setForm((f) => ({ ...f, pet_name: e.target.value }))}
+                    onChange={(e) => setForm((f) => ({ ...f, pet_id: "", pet_name: e.target.value }))}
                     className="w-full border border-[#dde3ee] rounded-xl px-4 py-3 text-sm text-[#172033] placeholder:text-[#c5ccda] focus:outline-none focus:border-[#1b2a6b] focus:ring-2 focus:ring-[#1b2a6b]/10 transition-all"
                   />
                 </div>
@@ -711,7 +793,7 @@ export default function PublicBookingPage({
                       return (
                         <button
                           key={sp.value}
-                          onClick={() => setForm((f) => ({ ...f, pet_species: sp.value }))}
+                          onClick={() => setForm((f) => ({ ...f, pet_id: "", pet_species: sp.value }))}
                           className={[
                             "flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 transition-all",
                             active
@@ -851,7 +933,8 @@ export default function PublicBookingPage({
                 setSelectedDate("");
                 setSelectedSlot(null);
                 setConfirmation(null);
-                setForm({ client_name: "", client_phone: "", client_email: "", pet_name: "", pet_species: "dog" });
+                setForm({ client_name: "", client_phone: "", client_email: "", pet_id: "", pet_name: "", pet_species: "dog" });
+                setKnownPets([]);
               }}
               className="w-full py-3.5 rounded-xl border-2 border-[#dde3ee] text-sm font-semibold text-[#5e6b85] hover:border-[#1b2a6b] hover:text-[#1b2a6b] transition-all"
             >

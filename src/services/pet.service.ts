@@ -58,6 +58,20 @@ export const petService = {
     await apiClient.post(`/pets/${id}/ai-diagnosis/save`, payload);
   },
 
+  transcribeAttendanceAudio: async (
+    id: string,
+    audio: Blob,
+  ): Promise<{ text: string; html: string }> => {
+    const formData = new FormData();
+    formData.append("audio", audio, "atendimento.wav");
+    const { data } = await apiClient.post<{ data: { text: string; html: string } }>(
+      `/pets/${id}/attendance-transcription`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return data.data;
+  },
+
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/pets/${id}`);
   },
