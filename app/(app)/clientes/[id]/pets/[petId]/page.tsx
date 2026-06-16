@@ -4410,7 +4410,7 @@ ${r("Observações clínicas", an.clinicalObservations)}
 
                 <div className="space-y-2">
                   <Label>Documento do atendimento</Label>
-                  <div className="overflow-hidden rounded-2xl border bg-white shadow-sm [&_.ck-editor__editable]:min-h-[560px] [&_.ck-editor__editable]:px-6 [&_.ck-editor__editable]:py-5 [&_.ck-editor__editable]:text-sm [&_.ck-editor__editable]:leading-7">
+                  <div className="overflow-hidden rounded-2xl border bg-white shadow-sm [&_.ck-content]:min-h-[640px] [&_.ck-content]:px-6 [&_.ck-content]:py-5 [&_.ck-content]:text-sm [&_.ck-content]:leading-7 [&_.ck-editor__editable_inline]:min-h-[640px] [&_.ck-editor__editable_inline]:max-h-none">
                     <CKEditor
                       editor={ClassicEditorBuild}
                       data={attendanceForm.document}
@@ -4438,7 +4438,7 @@ ${r("Observações clínicas", an.clinicalObservations)}
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Use a barra do CKEditor para formatar. A gravação com IA adiciona a transcrição ao final do documento.
+                    Use a barra acima para formatar o texto. A gravação com IA adiciona a transcrição ao final do documento.
                   </p>
                 </div>
 
