@@ -4410,7 +4410,7 @@ ${r("Observações clínicas", an.clinicalObservations)}
 
                 <div className="space-y-2">
                   <Label>Documento do atendimento</Label>
-                  <div className="overflow-hidden rounded-2xl border bg-white shadow-sm [&_.ck-editor__editable]:min-h-80 [&_.ck-editor__editable]:px-6 [&_.ck-editor__editable]:py-5 [&_.ck-editor__editable]:text-sm [&_.ck-editor__editable]:leading-7">
+                  <div className="overflow-hidden rounded-2xl border bg-white shadow-sm [&_.ck-editor__editable]:min-h-[560px] [&_.ck-editor__editable]:px-6 [&_.ck-editor__editable]:py-5 [&_.ck-editor__editable]:text-sm [&_.ck-editor__editable]:leading-7">
                     <CKEditor
                       editor={ClassicEditorBuild}
                       data={attendanceForm.document}
