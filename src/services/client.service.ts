@@ -34,4 +34,11 @@ export const clientService = {
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/clients/${id}`);
   },
+
+  getPublicBookingLink: async (id: string): Promise<{ token: string; url: string }> => {
+    const { data } = await apiClient.get<{ token: string; url: string }>(
+      `/clients/${id}/public-booking-link`,
+    );
+    return data;
+  },
 };

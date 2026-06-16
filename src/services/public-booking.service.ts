@@ -52,6 +52,32 @@ export interface BookingLookupResult {
   pets: BookingLookupPet[];
 }
 
+export interface ClientBookingItem {
+  id: string;
+  type: "service" | "product";
+  name: string;
+  category: string | null;
+  price: number;
+  duration: number | null;
+}
+
+export interface ClientBookingInfo {
+  clinic: { name: string; phone: string | null; city: string | null; state: string | null };
+  client: { name: string };
+  pets: BookingLookupPet[];
+  items: ClientBookingItem[];
+  working_hours: Record<string, { enabled: boolean; start: string; end: string }>;
+  slot_duration: number;
+}
+
+export interface ClientBookingPayload {
+  pet_id: string;
+  item_type: "service" | "product";
+  item_id: string;
+  date: string;
+  start_time: string;
+}
+
 export const publicBookingService = {
   getClinic: async (token: string): Promise<BookingClinicInfo> => {
     const { data } = await publicClient.get(`/public/booking/${token}`);
@@ -73,6 +99,27 @@ export const publicBookingService = {
 
   book: async (token: string, payload: BookingPayload) => {
     const { data } = await publicClient.post(`/public/booking/${token}/book`, payload);
+    return data;
+  },
+
+  getClientBooking: async (token: string): Promise<ClientBookingInfo> => {
+    const { data } = await publicClient.get(`/public/client-booking/${token}`);
+    return data;
+  },
+
+  getClientSlots: async (
+    token: string,
+    date: string,
+    item?: { type: "service" | "product"; id: string },
+  ): Promise<BookingSlot[]> => {
+    const { data } = await publicClient.get(`/public/client-booking/${token}/slots/${date}`, {
+      params: item ? { item_type: item.type, item_id: item.id } : undefined,
+    });
+    return data.slots;
+  },
+
+  bookClient: async (token: string, payload: ClientBookingPayload) => {
+    const { data } = await publicClient.post(`/public/client-booking/${token}/book`, payload);
     return data;
   },
 };

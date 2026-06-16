@@ -4,11 +4,13 @@ import { useParams, useRouter } from "next/navigation";
 import {
   Plus,
   ArrowLeft,
-  Edit,
   Skull,
   Printer,
   Download,
   ExternalLink,
+  Share2,
+  Copy,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -111,8 +113,15 @@ export default function ClienteDetailPage() {
     },
   });
 
+  const publicBookingLinkQuery = useMutation({
+    mutationFn: () => clientService.getPublicBookingLink(id),
+    onError: () =>
+      toast({ title: "Erro ao gerar link público", variant: "destructive" }),
+  });
+
   // ── Dialog state ───────────────────────────────────────────────────────────
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
+  const [publicBookingDialogOpen, setPublicBookingDialogOpen] = useState(false);
   const [eventForm, setEventForm] = useState({
     type: "consultation",
     date: new Date().toISOString().split("T")[0],
@@ -210,6 +219,20 @@ export default function ClienteDetailPage() {
     );
   };
 
+  const handleOpenPublicBookingLink = () => {
+    setPublicBookingDialogOpen(true);
+    if (!publicBookingLinkQuery.data) {
+      publicBookingLinkQuery.mutate();
+    }
+  };
+
+  const handleCopyPublicBookingLink = async () => {
+    const link = publicBookingLinkQuery.data?.url;
+    if (!link) return;
+    await navigator.clipboard.writeText(link);
+    toast({ title: "Link copiado" });
+  };
+
   // ── Render guards ──────────────────────────────────────────────────────────
   const loading = loadingClient || loadingPets;
 
@@ -228,16 +251,22 @@ export default function ClienteDetailPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6 font-sans">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="shrink-0">
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <div className="min-w-0">
-          <h1 className="text-xl sm:text-2xl font-bold truncate [font-family:var(--font-heading)]">{client.name}</h1>
-          <p className="text-muted-foreground text-sm truncate">
-            {client.phone} {client.email && `• ${client.email}`}
-          </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3 min-w-0">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="shrink-0">
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold truncate [font-family:var(--font-heading)]">{client.name}</h1>
+            <p className="text-muted-foreground text-sm truncate">
+              {client.phone} {client.email && `• ${client.email}`}
+            </p>
+          </div>
         </div>
+        <Button variant="outline" onClick={handleOpenPublicBookingLink} className="sm:w-auto w-full">
+          <Share2 className="w-4 h-4 mr-2" />
+          Compartilhar link
+        </Button>
       </div>
 
       <Tabs defaultValue="pets">
@@ -517,6 +546,53 @@ export default function ClienteDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* ── Public Booking Link Dialog ── */}
+      <Dialog open={publicBookingDialogOpen} onOpenChange={setPublicBookingDialogOpen}>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Link público do cliente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Envie este link para {client.name}. O tutor poderá escolher um pet cadastrado e agendar um serviço ou produto ativo do PDV.
+            </p>
+            {publicBookingLinkQuery.isPending ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground rounded-lg border p-3">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Gerando link...
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Input readOnly value={publicBookingLinkQuery.data?.url ?? ""} />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={handleCopyPublicBookingLink}
+                  disabled={!publicBookingLinkQuery.data?.url}
+                  title="Copiar link"
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPublicBookingDialogOpen(false)}>
+              Fechar
+            </Button>
+            {publicBookingLinkQuery.data?.url && (
+              <a href={publicBookingLinkQuery.data.url} target="_blank" rel="noreferrer">
+                <Button>
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Abrir link
+                </Button>
+              </a>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Event Dialog ── */}
       <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
