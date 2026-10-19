@@ -230,7 +230,7 @@ function LoginContent() {
                 <span className="text-sm text-muted-foreground">Lembrar de mim</span>
               </label>
               <Link
-                href="#"
+                href="/esqueci-senha"
                 className="text-sm text-accent font-medium hover:text-accent/80 transition-colors"
               >
                 Esqueci a senha
